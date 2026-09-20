@@ -286,6 +286,7 @@ export function ConnectionsPanel({ readOnly = false }: { readOnly?: boolean }) {
 
   return (
     <div className="space-y-6">
+      <GitHubMonitoringSettings readOnly={readOnly} />
       <SettingsSection title={i18nT('pages.settings.connectionsPanel.title')}>
         <p className="m-0 text-[12.5px] text-muted">{i18nT('pages.settings.connectionsPanel.intro')}</p>
         {error && (
@@ -306,5 +307,53 @@ export function ConnectionsPanel({ readOnly = false }: { readOnly?: boolean }) {
         ))}
       </SettingsSection>
     </div>
+  )
+}
+
+function GitHubMonitoringSettings({ readOnly }: { readOnly: boolean }) {
+  const qc = useQueryClient()
+  const [draft, setDraft] = useState<string | undefined>()
+  const query = useQuery<{ monitoring?: { github_hosts?: string[] } }>({
+    queryKey: ['kirocrewConfig'],
+    queryFn: api.kirocrewConfig,
+  })
+  const saved = (query.data?.monitoring?.github_hosts ?? ['github.com']).join('\n')
+  const mutation = useMutation({
+    mutationFn: (hosts: string[]) => api.patchConfig('monitoring.github_hosts', hosts),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ['kirocrewConfig'] })
+      setDraft(undefined)
+    },
+  })
+  const value = draft ?? saved
+  const hosts = value.split(/[\n,]/).map(host => host.trim().toLowerCase()).filter(Boolean)
+  const valid = hosts.every(host => host.length <= 253 && host.split('.').every(
+    label => /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(label),
+  ))
+  const error = mutation.error ?? query.error
+
+  return (
+    <SettingsSection title={i18nT('githubMonitoring.title')}>
+      <SettingsCard>
+        <SettingsInput
+          label={i18nT('githubMonitoring.hosts')}
+          description={i18nT('githubMonitoring.help')}
+          configKey="monitoring.github_hosts"
+          value={value}
+          onChange={setDraft}
+          multiline
+          disabled={readOnly || query.isLoading || !!query.error || mutation.isPending}
+        />
+        {!valid && <p className="text-sm text-muted">{i18nT('githubMonitoring.invalid')}</p>}
+        {/* No hand-off: preserve the unsaved host list and the OAuth drafts below. */}
+        <ErrorNotice message={error instanceof Error ? error.message : error ? String(error) : null} />
+        <Btn
+          disabled={readOnly || query.isLoading || !!query.error || mutation.isPending || !valid || value === saved}
+          onClick={() => mutation.mutate([...new Set(hosts)])}
+        >
+          {i18nT('pages.settings.connectionsPanel.save')}
+        </Btn>
+      </SettingsCard>
+    </SettingsSection>
   )
 }

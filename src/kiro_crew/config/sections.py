@@ -5858,7 +5858,7 @@ class DecisionsConfig:
 
 @dataclass
 class MonitoringConfig:
-    """Which side justifies itself when a session picks a monitoring path.
+    """Monitoring targets and guidance for choosing a monitoring path.
 
     Two paths can watch the same pull request today and NEITHER is gated. The
     probe-gated structured monitor (``monitor_watch``) and the per-interval
@@ -5869,12 +5869,24 @@ class MonitoringConfig:
 
     What is genuinely unsettable is which of the two an arming takes, and the
     reason is that no code chooses: the choice is made by the model reading the
-    two tool descriptions. So this section is read exactly where those
-    descriptions are built -- ``mcp_tools/control.py::schemas()`` -- and
-    nowhere else. That is the honest extent of it, and the help text below says
-    so rather than implying an enforcement this key does not have.
+    two tool descriptions. The preference is read where those descriptions are
+    built -- ``mcp_tools/control.py::schemas()``. The independent host allowlist
+    is enforced by the structured and prompt-loop GitHub PR probes.
     """
 
+    github_hosts: list[str] = field(
+        default_factory=lambda: ["github.com"],
+        metadata=_meta(
+            "GitHub Hosts for PR Monitoring",
+            "Exact GitHub hostnames allowed for pull-request monitoring, including "
+            "GitHub Enterprise Server. Keep github.com to watch public-host PRs. "
+            "Enter bare hostnames without https://, paths, ports or wildcards. "
+            "Adding a host permits credentialed gh CLI reads to that server. "
+            "Authenticate separately with gh auth login --hostname HOST on the "
+            "gateway machine. Changes apply on the next probe, without restart. "
+            "This does not configure the GitHub MCP connection.",
+        ),
+    )
     prefer_structured_arming: bool = field(
         default=False,
         metadata=_meta(

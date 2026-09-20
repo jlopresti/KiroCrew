@@ -37,6 +37,12 @@ The ACP-level workarounds we've built (the OAuth banner, dedup, completion patch
 
 ## The boundary in one sentence
 
+**Scope: the Kiro backend.** GitHub Connections with Codex has a separate
+gateway-owned encrypted grant, in the existing agent-hidden vault, projected
+only in memory onto the exact GitHub MCP entry. Its lifecycle and limitations
+are specified in [Connections](../../system-specs/modules/connections.md#github-oauth-with-codex).
+It does not read, migrate or delete Kiro's credential artifacts.
+
 kiro-cli owns the OAuth chain end to end and Kiro Crew never holds the credential:
 Kiro Crew can observe that a grant exists, by `stat` on the paired token and
 registration artifacts, and nothing more. A design that would move custody into Kiro

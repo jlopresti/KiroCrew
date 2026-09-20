@@ -11,6 +11,8 @@ vi.mock('../../api/client', () => ({
     connectionsOAuthClients: vi.fn(),
     connectionsOAuthClientSave: vi.fn(),
     connectionsOAuthClientDelete: vi.fn(),
+    kirocrewConfig: vi.fn(),
+    patchConfig: vi.fn(),
   },
 }))
 
@@ -85,10 +87,50 @@ async function mount(clients: ConnectionOAuthClient[] = [github(), asana()], rea
 }
 
 beforeEach(() => {
+  vi.mocked(api.kirocrewConfig).mockReset().mockResolvedValue({ monitoring: { github_hosts: ['github.com'] } })
+  vi.mocked(api.patchConfig).mockReset().mockResolvedValue({ ok: true })
   listMock.mockReset()
   saveMock.mockReset().mockResolvedValue({ ok: true, client: github({ client_id: 'abc', client_id_source: 'config' }) })
   deleteMock.mockReset().mockResolvedValue({ ok: true, client: github() })
   copyMock.mockClear()
+})
+
+describe('GitHub monitoring hosts', () => {
+  it('saves only the host setting and displays the persisted list', async () => {
+    await mount([])
+    const input = screen.getByRole('textbox', { name: 'Allowed GitHub hosts' })
+    expect(input).toHaveValue('github.com')
+    fireEvent.change(input, { target: { value: 'github.com\nGITHUB.CORP.EXAMPLE' } })
+    vi.mocked(api.kirocrewConfig).mockResolvedValue({ monitoring: { github_hosts: ['github.com', 'github.corp.example'] } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(api.patchConfig).toHaveBeenCalledWith('monitoring.github_hosts', ['github.com', 'github.corp.example']))
+    await waitFor(() => expect(input).toHaveValue('github.com\ngithub.corp.example'))
+  })
+
+  it('refuses URLs, wildcards and ports before saving', async () => {
+    await mount([])
+    for (const value of ['https://github.corp.example', '*.example', 'github.corp.example:443']) {
+      fireEvent.change(screen.getByRole('textbox', { name: 'Allowed GitHub hosts' }), { target: { value } })
+      expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+    }
+    expect(api.patchConfig).not.toHaveBeenCalled()
+  })
+
+  it('retains the draft and displays save failures', async () => {
+    await mount([])
+    vi.mocked(api.patchConfig).mockRejectedValue(new Error('Save unavailable'))
+    const input = screen.getByRole('textbox', { name: 'Allowed GitHub hosts' })
+    fireEvent.change(input, { target: { value: 'github.corp.example' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    expect(await screen.findByText('Save unavailable')).toBeInTheDocument()
+    expect(input).toHaveValue('github.corp.example')
+  })
+
+  it('does not permit editing in read-only mode', async () => {
+    await mount([], true)
+    expect(screen.getByRole('textbox', { name: 'Allowed GitHub hosts' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
+  })
 })
 
 describe('ConnectionsPanel — one card per pre-registered provider', () => {

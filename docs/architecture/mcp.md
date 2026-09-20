@@ -4,6 +4,11 @@ How MCP (Model Context Protocol) servers are configured, merged, probed and
 loaded, plus the two invariants every new Kiro Crew MCP tool must satisfy: it
 ships as an MCP tool (not only a CLI command), and it holds no per-caller state.
 
+The `monitor_start` tool describes full GitHub PR URLs using a hostname allowed
+by `monitoring.github_hosts`, including configured Enterprise hosts. The probe
+enforces that list and uses the gateway's per-host `gh` authentication; this
+does not change any MCP server's connection or credentials.
+
 Related: the CPP extension-point seam this doc reads from is
 [platform-context](../system-specs/modules/platform-context.md); the governance
 ceiling that filters auto-approve is
@@ -21,6 +26,13 @@ own gate model is [computer-use](../system-specs/modules/computer-use.md).
 > `mcp_cleanup.clean_stale_managed_mcp()` helper.
 
 ## Config file hierarchy
+
+For GitHub Connections on Codex, the agent file contains only the ordinary MCP
+entry. Its user's OAuth grant remains in the encrypted vault; the Codex mirror
+adds an Authorization header in memory after applying the spec's tool exposure
+rules. No token is persisted into either the agent file or Codex's global config.
+See [Connections](../system-specs/modules/connections.md#github-oauth-with-codex)
+for the exact endpoint binding, refresh and disconnect semantics.
 
 | File | Owner | Purpose | Read by |
 |------|-------|---------|---------|

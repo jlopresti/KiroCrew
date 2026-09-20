@@ -359,6 +359,19 @@ async def api_connections_mint(request: web.Request) -> web.Response:
             slug=slug,
         )
 
+    from kiro_crew.connections.github_oauth import for_request
+
+    native = await for_request(request, slug)
+    if native is not None:
+        result = await native.start()
+        sel().log_api_access(
+            caller="dashboard",
+            operation="connections_mint",
+            outcome="started",
+            resources="provider:github runtime:codex",
+        )
+        return web.json_response(result)
+
     # Function-local by DESIGN, not for a cycle: this handlers package is imported
     # on the gateway boot path, and the mint engine drags in the ACP client, the
     # credential predicate and the PID registry -- the warm engine adds the ACP
@@ -431,6 +444,12 @@ async def api_connections_mint_state(request: web.Request) -> web.Response:
     if _requested_provider(slug) is None:
         return _bad_request("unknown provider", "unknown_provider")
 
+    from kiro_crew.connections.github_oauth import for_request
+
+    native = await for_request(request, slug)
+    if native is not None:
+        return web.json_response(native.row)
+
     # Function-local for the same reason as the POST above: the boot path must not
     # carry the mint engine, and the subprocess guard test enforces it.
     from kiro_crew.connections.mint import expire_dead_holder, pending_mint_for
@@ -475,7 +494,17 @@ async def api_connections_status(request: web.Request) -> web.Response:
     # a route no expiry path anticipated; cheap enough to run per request because
     # liveness is a returncode read, not I/O.
     await expire_dead_mints()
-    statuses = await collect_connection_statuses()
+    from kiro_crew.connections.github_oauth import for_request, grant_presence
+
+    native = await for_request(request)
+    if native is not None:
+        presence = await asyncio.to_thread(grant_presence, native.home)
+        statuses = await collect_connection_statuses(
+            grant_overrides={"github": presence},
+            mint_overrides={"github": str(native.row["state"])},
+        )
+    else:
+        statuses = await collect_connection_statuses()
     return web.json_response({"schema_version": _STATUS_SCHEMA_VERSION, "connections": statuses})
 
 
@@ -549,7 +578,12 @@ async def api_connections_test(request: web.Request) -> web.Response:
         # Function-local by design: the handlers package is imported at
         # gateway boot, while this path imports the ACP client and should be
         # paid only when the owner explicitly clicks Test.
+        from kiro_crew.connections.github_oauth import for_request, test_tools
         from kiro_crew.connections.tool_test import test_connection_tools
+
+        native = await for_request(request, slug)
+        if native is not None:
+            return web.json_response(await test_tools(native.home))
 
         return web.json_response(await test_connection_tools(provider))
     finally:
@@ -587,9 +621,11 @@ async def api_connections_cancel(request: web.Request) -> web.Response:
     token = raw_token
 
     # Function-local, same boot-path reason as the mint handlers.
+    from kiro_crew.connections.github_oauth import for_request
     from kiro_crew.connections.mint import cancel_mint
 
-    dropped = await cancel_mint(slug, token)
+    native = await for_request(request, slug)
+    dropped = await native.cancel(token) if native is not None else await cancel_mint(slug, token)
 
     # A bare enqueue: SEL is warmed at gateway startup (sel.warm_sel_singleton),
     # so no per-site thread hop is needed.
@@ -675,6 +711,43 @@ async def api_connections_disconnect(request: web.Request) -> web.Response:
     slug = str(provider["slug"])
     mcp_url = str(provider["mcp_url"])
 
+    from kiro_crew.connections.github_oauth import for_request, forget_grant
+
+    native = await for_request(request, slug)
+    if native is not None:
+        # Keep connect/cancel serialized through the entire deletion, including
+        # worker writes. Never touch the separate Kiro credential artifacts.
+        async def _disconnect_native() -> web.Response:
+            async with native.lock:
+                await native._cancel()
+                native.row = {"slug": slug, "state": "idle"}
+                scope = await remove_provider_entry(
+                    slug,
+                    mcp_url,
+                    _open_project_dirs(request.app.get("state")),
+                    revoke_runtime_grant=False,
+                    native_grant_remover=lambda: forget_grant(native.home),
+                )
+            sel().log_api_access(
+                caller="dashboard",
+                operation="connections_disconnect",
+                outcome="completed",
+                resources="provider:github runtime:codex",
+            )
+            return web.json_response(
+                {
+                    "ok": True,
+                    "grantRemoved": bool(scope.grant_removed),
+                    "grantSurviving": [],
+                    "entryRemoved": scope.entry_removed,
+                    "grantSharedWith": list(scope.grant_shared_with),
+                    "grantCensusIncomplete": scope.census_incomplete,
+                    "grantCensusUnreadable": list(scope.census_unreadable),
+                }
+            )
+
+        return await asyncio.shield(_disconnect_native())
+
     # Function-local, same boot-path reason as the mint handlers.
     from kiro_crew.connections.mint import cancel_mint
     from kiro_crew.mcp_grant import surviving_grant_artifacts
@@ -749,6 +822,12 @@ async def api_connections_premint(request: web.Request) -> web.Response:
     owner_denied = await require_owner_dashboard_request(request, "connections_premint")
     if owner_denied is not None:
         return owner_denied
+
+    from kiro_crew.connections.github_oauth import enabled
+
+    if await asyncio.to_thread(enabled):
+        # Codex's GitHub flow is cheap and starts only on an explicit Connect.
+        return web.json_response({"ok": True, "preminting": []})
 
     # Function-local by DESIGN, not for a cycle: the handlers package is imported on
     # the gateway boot path, and the warm engine imports the cold mint at module
@@ -1125,6 +1204,9 @@ async def api_connections_oauth_client_put(request: web.Request) -> web.Response
 
     async def _mutate() -> web.Response | None:
         async with _OAUTH_CLIENT_MUTATION:
+            native = request.app.get("connections_native_oauth", {}).get(slug)
+            if native is not None:
+                await native.cancel()
             failure = await _write_oauth_client(
                 slug, client_id=client_id, secret=secret, clear=clear
             )
@@ -1203,6 +1285,9 @@ async def api_connections_oauth_client_delete(request: web.Request) -> web.Respo
 
     async def _mutate() -> web.Response | None:
         async with _OAUTH_CLIENT_MUTATION:
+            native = request.app.get("connections_native_oauth", {}).get(slug)
+            if native is not None:
+                await native.cancel()
             # Same order and the same rollback as the PUT: the vault half goes
             # first because it is the half that can be put back exactly, and a
             # failed config write restores it so the stored pair is the pair

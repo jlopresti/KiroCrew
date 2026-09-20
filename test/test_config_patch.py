@@ -181,6 +181,47 @@ class TestRoleModels:
 # ── General ──────────────────────────────────────────────────────────────
 
 
+class TestGitHubMonitorHosts:
+    @pytest.mark.asyncio
+    async def test_hosts_normalized_and_saved(self, tmp_config):
+        app, _ = _make_app_with_state()
+        async with TestClient(TestServer(app)) as client:
+            response = await _patch(
+                client,
+                "monitoring.github_hosts",
+                [
+                    "github.com",
+                    " GITHUB.CORP.EXAMPLE ",
+                    "github.corp.example",
+                ],
+            )
+            assert response.status == 200
+        assert json.loads(tmp_config.read_text())["monitoring"]["github_hosts"] == [
+            "github.com",
+            "github.corp.example",
+        ]
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "value",
+        [
+            "github.corp.example",
+            ["https://github.corp.example"],
+            ["*.example"],
+            ["github.corp.example:443"],
+            ["user@github.corp.example"],
+            [42],
+        ],
+    )
+    async def test_invalid_host_list_is_not_written(self, tmp_config, value):
+        before = tmp_config.read_text()
+        app, _ = _make_app_with_state()
+        async with TestClient(TestServer(app)) as client:
+            response = await _patch(client, "monitoring.github_hosts", value)
+            assert response.status == 400
+        assert tmp_config.read_text() == before
+
+
 # ── Terminal default shell (dashboard.terminal.shell) ─────────────────────
 
 

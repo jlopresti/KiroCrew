@@ -1,4 +1,10 @@
 {
+  "githubMonitoring": {
+    "title": "GitHub-PR-Überwachung",
+    "hosts": "Erlaubte GitHub-Hosts",
+    "help": "Ein Hostname pro Zeile, ohne https:// oder Pfad. Behalten Sie github.com bei Bedarf bei. Melden Sie sich auf dem Gateway mit gh auth login --hostname HOST an. Diese Einstellung konfiguriert nicht die GitHub-MCP-Verbindung.",
+    "invalid": "Geben Sie nur Hostnamen ohne Ports oder Platzhalter ein."
+  },
   "appChatLaunch": {
     "unsent": "{{error}}\n\nNachricht nicht gesendet. Kopiere sie, um es erneut zu versuchen:\n{{message}}",
     "cancelled": "Senden abgebrochen, weil du die Sitzung gewechselt hast.",

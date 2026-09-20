@@ -1,4 +1,10 @@
 {
+  "githubMonitoring": {
+    "title": "GitHub PR monitoring",
+    "hosts": "Allowed GitHub hosts",
+    "help": "One hostname per line, without https:// or a path. Keep github.com if needed. Authenticate on the gateway with gh auth login --hostname HOST. This setting does not configure the GitHub MCP connection.",
+    "invalid": "Enter bare hostnames only, without ports or wildcards."
+  },
   "appChatLaunch": {
     "unsent": "{{error}}\n\nMessage not sent. Copy it to try again:\n{{message}}",
     "cancelled": "Send cancelled because you switched sessions.",

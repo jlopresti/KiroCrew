@@ -41,6 +41,12 @@ and the top-bar credit readout keeps its separate billing refresh policy.
 
 ## Gateway restart
 
+The owner configuration PATCH route accepts `monitoring.github_hosts` as a list
+of exact bare hostnames, validates every entry before writing, and normalizes
+case/whitespace/duplicates. Settings → Connections edits this path alone, leaving
+OAuth client settings untouched. The probe reads the setting live; no restart
+is required. The behavior is specified in [config](config.md#github-pr-monitoring-hosts).
+
 The dashboard restart endpoint and successful update applies share
 `handlers/updates.py::_restart_gateway`. It coalesces duplicate requests and
 validates the composed stable launcher before saving history or closing sessions.

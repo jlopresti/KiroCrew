@@ -1,4 +1,10 @@
 {
+  "githubMonitoring": {
+    "title": "Surveillance des PR GitHub",
+    "hosts": "Domaines GitHub autorisés",
+    "help": "Un domaine par ligne, sans https:// ni chemin. Conservez github.com si nécessaire. Authentifiez-vous sur la passerelle avec gh auth login --hostname HOST. Ce réglage ne configure pas la connexion MCP GitHub.",
+    "invalid": "Saisissez uniquement des domaines, sans port ni caractère générique."
+  },
   "appChatLaunch": {
     "unsent": "{{error}}\n\nMessage non envoyé. Copie-le pour réessayer :\n{{message}}",
     "cancelled": "Envoi annulé car tu as changé de session.",

@@ -327,6 +327,11 @@ class CodexHarness(MembershipHarness):
         from kiro_crew.config import loader as loader_mod
 
         loader_mod.strip_kiro_cli_api_key(env)
+        # Session-projected entries are authoritative for Crew. codex-acp's
+        # default filtering otherwise discards our GitHub authorization (and
+        # spec restrictions) when the user's global config has the same name.
+        # This changes the adapter process only; no provider-global file is written.
+        env["DISABLE_MCP_CONFIG_FILTERING"] = "true"
 
     @property
     def verifies_agent_activation(self) -> bool:

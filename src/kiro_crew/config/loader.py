@@ -4395,6 +4395,8 @@ class KiroCrewConfig:
         # CHANGES: config.json materializes every key, so the stored value
         # outranks the new default forever. Adding a key has no stored value to
         # outrank it.)
+        from kiro_crew.github_hosts import normalize_github_hosts
+
         monitoring_data = _coerced_section(data, "monitoring", _degraded)
         monitoring_prefer_structured_arming = _safe_bool(
             monitoring_data.get("prefer_structured_arming"), False
@@ -4640,7 +4642,10 @@ class KiroCrewConfig:
             ),
             heartbeat=HeartbeatConfig(default_deliver=heartbeat_default_deliver),
             monitoring=MonitoringConfig(
-                prefer_structured_arming=monitoring_prefer_structured_arming
+                prefer_structured_arming=monitoring_prefer_structured_arming,
+                github_hosts=normalize_github_hosts(
+                    monitoring_data.get("github_hosts", MonitoringConfig().github_hosts)
+                ),
             ),
             decisions=DecisionsConfig.from_raw(decisions_data),
             skills=_build_skills_config(skills_data),

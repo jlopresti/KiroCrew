@@ -82,10 +82,7 @@ _AUDIT_CALLER = "core:babysit-pr-watch"
 
 _GH_TIMEOUT_SECS = 25
 
-#: The one host a watch message may pin. Not a configuration point: a subject
-#: inferred from a public GitHub URL pins this so a bare ``owner/name`` slug
-#: cannot be re-pointed by an ambient ``GH_HOST``. Choosing an enterprise host
-#: stays where this module already puts it -- the operator's own gh config.
+#: Preserve public-host state identities while namespacing Enterprise subjects.
 _PINNABLE_HOST = "github.com"
 
 #: How far back a conversation signal still counts as new.
@@ -327,11 +324,7 @@ class PrWatchProbe(Probe):
             raise ValueError("pr_watch message must be a JSON object")
         repo = params.get("repo") or ""
         pr = params.get("pr")
-        # owner/name ONLY -- no host segment. A host inside the watch
-        # parameters would let whoever composes the cron message point a
-        # credentialed gh call at an arbitrary server; enterprise hosts are
-        # selected by the operator's own trusted gh configuration (GH_HOST),
-        # never by data.
+        # The repository cannot override the separately validated host.
         if not (isinstance(repo, str) and re.fullmatch(r"[\w.-]+/[\w.-]+", repo)):
             raise ValueError('pr_watch needs {"repo": "owner/name"}')
         if not isinstance(pr, int) or isinstance(pr, bool) or pr <= 0:
@@ -369,24 +362,23 @@ class PrWatchProbe(Probe):
         raw_wake = params.get("wake_on_green", True)
         if not isinstance(raw_wake, bool):
             raise ValueError("pr_watch wake_on_green must be true or false")
-        # Deliberately NOT an arbitrary hostname. This module's own rule is that
-        # an enterprise host is selected by the operator's trusted gh
-        # configuration and never by data, and a free-form key here would reopen
-        # exactly that door to whoever can write a watch message. The only
-        # producer passes the one constant, so the contract is the constant: it
-        # PINS the public host against an ambient GH_HOST rather than choosing a
-        # host. Widen it when a second value has a real caller, and give that
-        # caller its own reasoning.
+        # Only the operator's allowlist can authorize an explicit host. A watch
+        # message alone cannot redirect the credential-bearing CLI.
+        from kiro_crew.github_hosts import github_host_allowed
+
         raw_host = params.get("host")
         host = str(raw_host or "").strip().lower()
-        if host and host != _PINNABLE_HOST:
-            raise ValueError(f"pr_watch host, when given, must be {_PINNABLE_HOST!r}")
+        if host and not github_host_allowed(host):
+            raise ValueError("pr_watch host must be configured in monitoring.github_hosts")
         self.host = host
         self.known_reds = {sanitize_label(x) for x in raw_reds or [] if isinstance(x, str)}
         self.wake_on_green = raw_wake
         self.note = str(params.get("note") or "")[:500]
         self.coalesce_secs = coalesce
-        return ("gh-pr", f"{repo}#{pr}")
+        subject = f"{repo}#{pr}"
+        if host and host != _PINNABLE_HOST:
+            subject = f"{host}/{subject}"
+        return ("gh-pr", subject)
 
     def tuning(self) -> dict[str, float]:
         """The window this watch was armed with, from its cron message."""

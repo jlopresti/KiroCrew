@@ -29,7 +29,7 @@ import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 from urllib.parse import urlsplit
 
 from kiro_crew.agent_spec_format import (
@@ -275,7 +275,12 @@ def spec_census(
 
 
 async def remove_provider_entry(
-    slug: str, mcp_url: str, project_dirs: tuple[Path, ...]
+    slug: str,
+    mcp_url: str,
+    project_dirs: tuple[Path, ...],
+    *,
+    revoke_runtime_grant: bool = True,
+    native_grant_remover: Callable[[], bool] | None = None,
 ) -> DisconnectScope:
     """Decide what this Disconnect owns and act on it, all under ONE lock.
 
@@ -578,7 +583,14 @@ async def remove_provider_entry(
         # each branch actually did rather than one sweep at the end: a branch that KEPT the
         # grant knows it without a stat, and only an attempted pair is re-read.
         residue = False
-        if census_gap:
+        if not revoke_runtime_grant:
+            # A backend-owned grant is deleted by its adapter, not by unlinking
+            # an unrelated Kiro runtime's credential pair.
+            residue = True
+            if not census_gap and not shared and native_grant_remover is not None:
+                if await _offload_config_write(native_grant_remover):
+                    removed.append("native_oauth")
+        elif census_gap:
             # The gap is about the census as a whole -- an unreadable source or an
             # uncomparable URL could hide a sharer of ANY owned pair -- so every
             # pair is kept, not just the one a named sharer covers.

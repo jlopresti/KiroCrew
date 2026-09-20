@@ -1,4 +1,10 @@
 {
+  "githubMonitoring": {
+    "title": "Monitoraggio delle PR GitHub",
+    "hosts": "Host GitHub consentiti",
+    "help": "Un nome host per riga, senza https:// o percorso. Mantieni github.com se necessario. Autenticati sul gateway con gh auth login --hostname HOST. Questa impostazione non configura la connessione MCP GitHub.",
+    "invalid": "Inserisci solo nomi host, senza porte o caratteri jolly."
+  },
   "appChatLaunch": {
     "unsent": "{{error}}\n\nMessaggio non inviato. Copialo per riprovare:\n{{message}}",
     "cancelled": "Invio annullato perché hai cambiato sessione.",

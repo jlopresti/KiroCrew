@@ -1930,6 +1930,7 @@ _EDITABLE_CONFIG: dict[str, dict] = {
     # cannot open an unattended path -- it only changes which of the two the
     # monitor tool descriptions name as the default.
     "monitoring.prefer_structured_arming": {"type": "bool"},
+    "monitoring.github_hosts": {"type": "github_hosts"},
     "auto_update": {"type": "bool"},
     "dashboard.mcp_probe_timeout_secs": {
         "type": "int",
@@ -2256,6 +2257,14 @@ async def api_kirocrew_config_patch(request: web.Request) -> web.Response:
             reason = validate_fn(value, request)
             if reason:
                 return _deny(reason, f"{path_key}={value}")
+    elif spec["type"] == "github_hosts":
+        from kiro_crew.github_hosts import normalize_github_hosts
+
+        if not isinstance(value, list) or any(
+            not normalize_github_hosts([entry]) for entry in value
+        ):
+            return _deny("must be a list of bare GitHub hostnames", f"{path_key}={value}")
+        value = normalize_github_hosts(value)
     elif spec["type"] == "dict":
         # One-level record written ATOMICALLY as a single value, for settings
         # where multiple scalar fields form one verdict and a partial write is

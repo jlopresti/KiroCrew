@@ -11,6 +11,8 @@ from unittest import mock
 
 import pytest
 
+from kiro_crew.config import KiroCrewConfig
+from kiro_crew.config.sections import MonitoringConfig
 from kiro_crew.github_runner import SetupError
 from kiro_crew.monitoring import github_pull_request
 from kiro_crew.monitoring.decision import decide_monitor
@@ -240,18 +242,8 @@ def _alias_error(
 def _target_on_another_host(
     target: GitHubPullRequestTarget, host: str = "github.example.com"
 ) -> GitHubPullRequestTarget:
-    """The same subject on a second host, which the target type refuses to build.
-
-    ``GitHubPullRequestTarget`` validates its host on construction and accepts only
-    ``github.com``, so a second host cannot be reached through the type or through
-    ``parse_github_pull_request_target``. The provider still checks that a chunk
-    names one host, and the state that check exists for has to be assembled around
-    the validator rather than through it. Every other field stays as the real
-    parser produced it.
-    """
-    twin = deepcopy(target)
-    object.__setattr__(twin, "host", host)
-    return twin
+    """Build a well-formed identity to exercise the mixed-chunk defensive guard."""
+    return GitHubPullRequestTarget(host, target.owner, target.repo, target.number)
 
 
 class _FakeRunner:
@@ -3306,35 +3298,37 @@ class TestBatchedReads:
         assert one == "github.com"
         assert two is None
 
-    def test_a_chunk_naming_two_hosts_is_refused_rather_than_pinned_to_one(self) -> None:
-        """A query carries one token, so it must never span two hosts.
-
-        The refusal is the whole query, because the query is what carries the
-        identity -- reading the second host's subject under the first host's token
-        is the harm. Nothing can reach this state today, which is why the check
-        exists rather than a per-host grouping pass: a check can be exercised, and
-        this is where it is.
-        """
-        runner = _CompletedRunner([])
-        provider = GitHubPullRequestProvider(resolver=lambda: "/trusted/bin/gh", runner=runner)
-        here = parse_github_pull_request_target("https://github.com/owner/repo/pull/1")
-        elsewhere = _target_on_another_host(
-            parse_github_pull_request_target("https://github.com/owner/repo/pull/2")
+    def test_hosts_are_batched_separately(self, monkeypatch) -> None:
+        """Identical repository/PR numbers on two hosts must never share a query."""
+        config = KiroCrewConfig(
+            monitoring=MonitoringConfig(github_hosts=["github.com", "github.example.com"])
         )
-        admitted = {"https://github.com/owner/repo/pull/1": here, "elsewhere": elsewhere}
+        monkeypatch.setattr(KiroCrewConfig, "load", lambda: config)
+        runner = _FakeRunner(_batched_reads(_primary()) + _batched_reads(_primary()))
+        provider = GitHubPullRequestProvider(resolver=lambda: "/trusted/bin/gh", runner=runner)
+        urls = (
+            "https://github.com/owner/repo/pull/123",
+            "https://github.example.com/owner/repo/pull/123",
+        )
+        results = provider.probe(urls)
+        assert set(results) == set(urls)
+        assert all(result.observation.provider_error is None for result in results.values())
+        assert [kwargs["pin_host"] for _, kwargs in runner.calls] == [
+            "github.com",
+            "github.com",
+            "github.com",
+            "github.example.com",
+            "github.example.com",
+            "github.example.com",
+        ]
+        assert all("s1:" not in argv[4] for argv, _ in runner.calls)
 
-        with mock.patch.object(
-            github_pull_request,
-            "parse_github_pull_request_target",
-            side_effect=lambda raw: admitted[raw],
-        ):
-            results = provider.probe(tuple(admitted))
-
+        # Revocation is observed without rebuilding the provider or restarting.
+        config.monitoring.github_hosts = ["github.com"]
+        runner.calls.clear()
+        result = provider.probe((urls[1],))[urls[1]]
+        assert result.observation.provider_error is not None
         assert runner.calls == []
-        assert set(results) == set(admitted)
-        for result in results.values():
-            assert result.observation.provider_error is ProviderErrorKind.SETUP
-            assert result.observation.reason_code == "provider_setup"
 
 
 class TestRollupDescribesTheHeadItWasAskedAbout:
@@ -3746,6 +3740,20 @@ class TestRestFallbackOnRateLimit:
     bucket while the REST bucket stays untouched and answering, so a probe bound to
     GraphQL alone retires a healthy pull request on ``max_provider_errors``.
     """
+
+    def test_enterprise_rest_fallback_keeps_the_host(self, monkeypatch) -> None:
+        config = KiroCrewConfig(monitoring=MonitoringConfig(github_hosts=["github.corp.example"]))
+        monkeypatch.setattr(KiroCrewConfig, "load", lambda: config)
+        buckets = _BucketRunner(rest=_rest_board())
+        runner = mock.Mock(wraps=buckets)
+        provider = GitHubPullRequestProvider(resolver=lambda: "/trusted/bin/gh", runner=runner)
+        result = _probe_one(provider, "https://github.corp.example/owner/repo/pull/123")
+        assert result.observation.provider_error is None
+        assert result.observation.status is MonitorObservationStatus.PENDING
+        assert buckets.rest_paths == [_REST_PULL_REQUEST_PATH, _REST_STATUS_PATH]
+        assert all(
+            call.kwargs["pin_host"] == "github.corp.example" for call in runner.call_args_list
+        )
 
     def test_a_rate_limited_read_yields_facts_instead_of_a_provider_error(self) -> None:
         """THE bug: the tick reports the subject rather than a refusal.

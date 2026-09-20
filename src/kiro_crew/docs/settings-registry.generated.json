@@ -832,6 +832,14 @@
       "description": "Draw a cursor that glides to each target and pulses when it clicks, so you can follow along on screen. Purely visual — it changes nothing about what the agent is allowed to do, and it only appears for clicks that move the real pointer."
     },
     {
+      "id": "connections.allowed-github-hosts",
+      "label": "Allowed GitHub hosts",
+      "tab": "connections",
+      "route": "/settings/connections?highlight=key%3Amonitoring.github_hosts",
+      "description": "One hostname per line, without https:// or a path. Keep github.com if needed. Authenticate on the gateway with gh auth login --hostname HOST. This setting does not configure the GitHub MCP connection.",
+      "configKey": "monitoring.github_hosts"
+    },
+    {
       "id": "connections.client-id",
       "label": "Client ID",
       "tab": "connections",

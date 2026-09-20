@@ -162,6 +162,22 @@ pins both the request wording and the local-binding behavior.
 
 ## PR watch probe
 
+The structured PR provider and prompt-loop inference accept HTTPS PR URLs on
+the exact hosts configured in `monitoring.github_hosts` (default `github.com`).
+Settings → Connections exposes this list, including internal GitHub Enterprise
+Server domains. Each read pins the URL's host through the audited `gh` runner;
+the gateway needs network access, trusted TLS certificates and a separate
+`gh auth login --hostname HOST` login for that server. Do not disable TLS checks.
+The GitHub MCP connection is independent of this setting.
+
+Inference declines messages naming multiple PRs, including identical slugs and
+numbers on different servers. An explicit cron `host` must be allowed too;
+Enterprise subjects include the host in their persisted identity. Legacy cron
+messages without a host keep their existing ambient `gh` resolution. Removing
+a host prevents subsequent explicit probes; it does not erase retained watch
+state. Existing lifecycle/check/review classifications remain unchanged, and an
+unsupported Enterprise API field produces incomplete/error evidence, not success.
+
 `PrWatchProbe.identity` accepts a JSON cron message describing one GitHub
 repository and pull request, optional inherited-red check names, green-wake
 preference, coalescing override, and contextual note. Invalid permanent

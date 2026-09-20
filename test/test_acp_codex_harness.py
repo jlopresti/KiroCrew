@@ -754,6 +754,11 @@ class TestSpawn:
         adapter.apply_spawn_env(env)
         assert env["CODEX_PATH"] == "/opt/my-codex"
 
+    def test_crew_mcp_projection_wins_over_provider_global_config(self, adapter):
+        env = {"DISABLE_MCP_CONFIG_FILTERING": "false"}
+        adapter.apply_spawn_env(env)
+        assert env["DISABLE_MCP_CONFIG_FILTERING"] == "true"
+
     def test_crew_own_sandbox_is_the_only_confinement(self, adapter):
         """A Node adapter carries no OS sandbox for Crew's to nest inside or defer to."""
         assert adapter.internal_sandbox is False

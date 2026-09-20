@@ -8,11 +8,19 @@ disconnect, and the two launch-gate rungs. The subsystem is
 `l0_record.py`, `l1_smoke.py`, `tool_test.py`), plus
 `dashboard/handlers/connections.py` and `website/src/pages/connections/`.
 
+Settings → Connections also hosts the independent GitHub PR monitoring host
+list (`monitoring.github_hosts`). It writes only that config path, preserves an
+unsaved draft on failure, and honors the panel's read-only mode. It neither
+creates an OAuth app nor reconfigures the remote GitHub MCP server. The PR
+probes use per-host `gh` authentication on the gateway; see
+[babysit-pr-watch](babysit-pr-watch.md#pr-watch-probe).
+
 The `src/kiro_crew/connections/vendors/zoom/` subtree is a separate connector-campaign slice with its own owning spec — [connector-zoom.md](connector-zoom.md) (`W11-A` Zoom contract semantics) — not this subsystem's OAuth-grant plumbing.
 
-**Kiro Crew never holds a connection's credential.** kiro-cli owns the OAuth chain
-end to end; Kiro Crew observes grant presence by `stat`, and every rule below follows
-from that boundary. The credential-boundary detail lives in
+**On the Kiro backend, Kiro Crew never holds a connection's credential.** kiro-cli
+owns the OAuth chain end to end; Kiro Crew observes grant presence by `stat`.
+GitHub on the Codex backend uses the independent flow described below. The
+Kiro credential-boundary detail lives in
 [`../architecture/design-notes/mcp-oauth-ownership.md`](../../architecture/design-notes/mcp-oauth-ownership.md).
 
 One thing that looks like an exception is not one. A provider whose MCP server
@@ -28,6 +36,54 @@ existing `headers` secrets have: vault is truth, the spec is a projection.** See
 "Pre-registered OAuth clients" below.
 
 ## Status and cancel
+
+### GitHub OAuth with Codex
+
+When `agent.acp_backend=codex`, the GitHub card uses
+`connections/github_oauth.py` rather than an ACP helper. The operator's existing
+OAuth application and `http://127.0.0.1:48101/callback` are reused. Connect opens
+one loopback-only, app-owned listener, with a ten-minute deadline, random
+single-use state and S256 PKCE. Host and state must match, duplicate query
+parameters are rejected, access logging is disabled, and the token exchange
+uses fixed github.com HTTPS endpoints without following redirects. The existing
+owner-only paste-back relay also reaches this listener. Requested scopes come
+from the dashboard's source GitHub entry (before rendering can erase an explicit
+empty list), or the rendered entry when not dashboard-owned. Registry scopes are
+used only when no scope hint is present; an unreadable source fails closed.
+
+This adapter deliberately owns its grant: access and refresh tokens are stored
+as one encrypted entry in the existing `.vault`, which is already hidden from
+agent processes. No new sandbox mask, provider-global config, plaintext token
+file or token-bearing command line is introduced. The Codex mirror adds the
+bearer in memory only for the exact `github` HTTP entry at
+`https://api.githubcopilot.com/mcp/`, after normal spec filtering. An explicit
+Authorization header is never replaced. Other names, hosts, URL variants and
+backends never receive this grant. Kiro's credential store is unchanged.
+
+The same mint/status/cancel/test/disconnect endpoints serve this adapter. State
+belongs to the dashboard application, never a global OAuth process. Cancel and
+shutdown close the listener; superseding a Connect rotates its row token.
+Disconnect drains an in-flight save before the existing ownership transaction
+removes the matching MCP entry and, only for a complete census with no sharer,
+deletes the encrypted grant under that same lock. Shared or indeterminate grants
+are retained and reported. It never touches Kiro grant artifacts or starts Kiro
+prewarming. App credential edits cancel pending native consent.
+The Test action initializes the remote MCP server and enumerates tools without
+an LLM prompt or tool call, using the actual Codex-projected headers (including
+explicit authorization, toolsets and read-only headers) and disabled tools.
+No raw token-exchange response or exception is returned to the dashboard.
+
+OAuth App grants normally do not expire. Expiring GitHub App grants are refreshed
+before a new Codex session or a Test action; an already-running session holds its
+original in-memory header and needs a new session after that token expires or
+is revoked. Disconnect removes local authorization, not GitHub-side approval or
+credentials already handed to an existing session. Revoke the app on GitHub to
+invalidate those immediately. Status reports local grant availability, not an
+online check on every poll. Enterprise MCP OAuth and other Connections providers
+are outside this adapter; the Enterprise PR watcher still uses per-host `gh` auth.
+
+Pinned by `test_connections_github_oauth.py` and the existing Kiro Connections
+and Codex mirror regression suites.
 
 How a Connections card learns whether a provider is actually authorized, what a
 Cancel releases, and what the mint audit trail records about each route.

@@ -30,6 +30,22 @@ surfaces, out-of-range values are clamped with a warning rather than raising, an
 a malformed section degrades to defaults so a hand-edited file cannot prevent the
 gateway from starting.
 
+## GitHub PR monitoring hosts
+
+`monitoring.github_hosts` defaults to `["github.com"]`. Settings → Connections
+exposes the list as one bare hostname per line; the CLI/config file accepts a
+JSON array. For example, `["github.com", "github.corp.example"]` enables PR
+monitoring on both servers. Names are trimmed, lowercased and deduplicated.
+Schemes, userinfo, paths, ports, wildcards and malformed DNS labels are rejected
+by the dashboard PATCH validator and dropped by the tolerant config loader.
+An explicitly empty list admits no hosts. A non-list value is rejected by the
+config schema and falls back to `github.com` only; it cannot authorize Enterprise.
+
+Both PR monitoring paths read the list afresh on each probe; changing it requires
+no restart. It is application configuration, not a sandbox/governance ceiling.
+Authenticate separately on the gateway with `gh auth login --hostname HOST`.
+This does not change the GitHub MCP/OAuth connection or other apps' host settings.
+
 ## Embedding rebuild request publication
 
 `memory.embed_rebuild_generation` is an explicit-apply request identity, not a

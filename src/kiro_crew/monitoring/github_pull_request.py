@@ -1,4 +1,4 @@
-"""Typed public-GitHub pull-request observations for structured monitors."""
+"""Typed GitHub pull-request observations for structured monitors."""
 
 from __future__ import annotations
 
@@ -15,6 +15,7 @@ from pathlib import PurePosixPath
 from typing import Any
 from urllib.parse import urlparse
 
+from kiro_crew.github_hosts import PUBLIC_GITHUB_HOST, github_host_allowed, normalize_github_hosts
 from kiro_crew.github_runner import SetupError, resolve_gh, run_gh
 from kiro_crew.monitoring.github_provider_errors import (
     REASON_SHARED_COOLDOWN,
@@ -40,7 +41,7 @@ from kiro_crew.monitoring.pull_request import (
 )
 from kiro_crew.security import redact
 
-_GITHUB_HOST = "github.com"
+_GITHUB_HOST = PUBLIC_GITHUB_HOST
 _SEGMENT_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 _URL_IN_CHECK_IDENTITY_RE = re.compile(r"https?://\S+", re.IGNORECASE)
 _RAW_URL_CONTROL_RE = re.compile(r"[\x00-\x1f\x7f-\x9f\u2028\u2029]")
@@ -143,7 +144,7 @@ GitHubRunner = Callable[..., subprocess.CompletedProcess[str]]
 
 @dataclass(frozen=True)
 class GitHubPullRequestTarget:
-    """Validated identity of one public GitHub pull request."""
+    """Well-formed identity; URL admission separately checks the host allowlist."""
 
     host: str
     owner: str
@@ -151,15 +152,15 @@ class GitHubPullRequestTarget:
     number: int
 
     def __post_init__(self) -> None:
-        if self.host != _GITHUB_HOST:
-            raise ValueError("target must be a public GitHub pull request")
+        if normalize_github_hosts([self.host]) != [self.host]:
+            raise ValueError("target must be a GitHub pull request with a valid host")
         if any(
             segment in {".", ".."} or _SEGMENT_RE.fullmatch(segment) is None
             for segment in (self.owner, self.repo)
         ):
-            raise ValueError("target must be a public GitHub pull request")
+            raise ValueError("target must be a GitHub pull request")
         if isinstance(self.number, bool) or not isinstance(self.number, int) or self.number <= 0:
-            raise ValueError("target must be a public GitHub pull request")
+            raise ValueError("target must be a GitHub pull request")
 
     @property
     def identity(self) -> str:
@@ -223,12 +224,8 @@ def _shared_host(members: Sequence[_BatchSubject]) -> str | None:
     caller refuses the whole query when it does not hold, because the query is the
     unit that carries the identity.
 
-    Nothing can reach the ``None`` branch today -- ``parse_github_pull_request_target``
-    accepts only ``github.com`` -- which is why the check exists instead of a
-    grouping pass keyed on the host. A pass that sorts subjects into per-host
-    queries would be machinery for a case no test can construct; a check is
-    exercised by construction and fails closed the day the target gate admits a
-    second host.
+    The batching pass groups allowed hosts before chunking; this guard prevents
+    a malformed chunk from crossing that boundary.
     """
     hosts = {member.target.host for member in members}
     if len(hosts) != 1:
@@ -329,7 +326,15 @@ class GitHubPullRequestProvider:
         except (SetupError, FileNotFoundError, OSError) as exc:
             results.update(_group_error(members, _exception_failure(exc)))
             return results
-        for chunk in _chunked(members, _MAX_SUBJECTS_PER_QUERY):
+        by_host: dict[str, list[_BatchSubject]] = {}
+        for member in members:
+            by_host.setdefault(member.target.host, []).append(member)
+        chunks = [
+            chunk
+            for group in by_host.values()
+            for chunk in _chunked(group, _MAX_SUBJECTS_PER_QUERY)
+        ]
+        for chunk in chunks:
             host = _shared_host(chunk)
             if host is None:
                 # Refuse the query rather than pin it to one of two hosts, which
@@ -842,18 +847,20 @@ class GitHubPullRequestProvider:
 
 
 def parse_github_pull_request_target(raw: str) -> GitHubPullRequestTarget:
-    """Parse one exact public GitHub pull-request URL into a typed identity."""
+    """Parse one exact GitHub pull-request URL on an operator-approved host."""
     if not isinstance(raw, str) or not raw or _RAW_URL_CONTROL_RE.search(raw):
         raise ValueError("target must be a GitHub pull request URL")
     parsed = urlparse(raw)
     try:
         host = (parsed.hostname or "").lower()
+        if host == f"www.{_GITHUB_HOST}":
+            host = _GITHUB_HOST
         port = parsed.port
     except ValueError as exc:
-        raise ValueError("target must be a public GitHub pull request URL") from exc
+        raise ValueError("target must be a GitHub pull request URL") from exc
     if (
         parsed.scheme != "https"
-        or host not in {_GITHUB_HOST, f"www.{_GITHUB_HOST}"}
+        or not github_host_allowed(host)
         or parsed.username is not None
         or parsed.password is not None
         or port is not None
@@ -861,7 +868,7 @@ def parse_github_pull_request_target(raw: str) -> GitHubPullRequestTarget:
         or parsed.query
         or parsed.fragment
     ):
-        raise ValueError("target must be a public GitHub pull request URL")
+        raise ValueError("target must be a GitHub pull request URL on a configured host")
     parts = PurePosixPath(parsed.path).parts
     if len(parts) != 5 or parts[0] != "/" or parts[3] != "pull":
         raise ValueError("target must be a GitHub pull request URL")
@@ -876,7 +883,7 @@ def parse_github_pull_request_target(raw: str) -> GitHubPullRequestTarget:
     ):
         raise ValueError("target must be a GitHub pull request with a positive number")
     try:
-        return GitHubPullRequestTarget(_GITHUB_HOST, owner, repo, int(raw_number, 10))
+        return GitHubPullRequestTarget(host, owner, repo, int(raw_number, 10))
     except ValueError as exc:
         raise ValueError("target must be a valid GitHub pull request") from exc
 

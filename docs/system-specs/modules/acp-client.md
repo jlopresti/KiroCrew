@@ -6,6 +6,14 @@ The ACP layer spans **five** modules: the legacy per-session client (`acp/client
 
 ## Backend Selection
 
+Codex's harness sets `DISABLE_MCP_CONFIG_FILTERING=true` for its adapter process:
+session-projected MCP entries must win over same-named provider-global entries.
+Otherwise codex-acp drops the GitHub bearer supplied by the Connections adapter
+when the operator already has a `github` server in their Codex config. The global
+file itself is never changed. The Codex mirror resolves the native GitHub grant
+only after spec filtering, onto the exact approved endpoint; see
+[connections](connections.md#github-oauth-with-codex).
+
 `AcpSessionHandle.active_agent` records the mode named by session configuration,
 a completed mode handshake or an observed agent-switch event. A queued mode
 request clears that observation until confirmation. `AcpSessionProvider` exposes

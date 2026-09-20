@@ -20,14 +20,10 @@ import json
 import re
 from dataclasses import dataclass
 
+from kiro_crew.monitoring.github_pull_request import parse_github_pull_request_target
 from kiro_crew.probes import GH_PR
 
-#: The host a public GitHub URL names, and the ONLY value this module ever pins.
-#: A shorthand subject deliberately gets no host at all -- see :func:`infer`.
-_PUBLIC_HOST = "github.com"
-
-#: ``https://github.com/owner/name/pull/123`` (any host path prefix is refused
-#: by the anchor -- an enterprise host is a different API and a different probe).
+#: Full PR URLs are candidates only; the shared parser enforces the host allowlist.
 #:
 #: The owner and repo quantifiers are BOUNDED, at GitHub's own limits: an account
 #: name is at most 39 characters and a repository name at most 100. Unbounded
@@ -35,7 +31,7 @@ _PUBLIC_HOST = "github.com"
 #: ``/`` makes the engine retry the class from every start position -- and the input
 #: is agent-authored prose, so the bound is load-bearing rather than cosmetic.
 _PR_URL = re.compile(
-    r"https?://(?:www\.)?github\.com/"
+    r"https?://[^/\s]{1,253}/"
     r"(?P<owner>[A-Za-z0-9._-]{1,39})/(?P<repo>[A-Za-z0-9._-]{1,100})/pull/(?P<pr>\d+)\b"
 )
 
@@ -110,8 +106,8 @@ def infer(text: str) -> Target | None:
     if not isinstance(text, str) or not text:
         return None
 
-    found: set[tuple[str, str, int]] = set()
-    # ONLY an explicit public pull-request URL gates a loop. A bare
+    found: set[tuple[str, str, str, int]] = set()
+    # ONLY an explicit allowed pull-request URL gates a loop. A bare
     # ``owner/name#123`` proves neither of the two things this decision needs:
     #
     # * not that the subject is a PULL REQUEST -- ``#123`` is equally an issue
@@ -130,16 +126,16 @@ def infer(text: str) -> Target | None:
         try:
             number = int(match.group("pr"))
         except ValueError:
-            # ``\d+`` is unbounded, and CPython refuses to convert a decimal
-            # string past its digit limit. The instruction is agent-written
-            # prose, so a pathological run of digits must REFUSE the match
-            # rather than raise out of inference: this function is called on
-            # the arming path, where an exception would fail to arm the loop
-            # at all instead of merely declining to gate it.
             continue
         if number <= 0:
             continue
-        found.add((match.group("owner"), match.group("repo"), number))
+        try:
+            parsed = parse_github_pull_request_target(match.group())
+        except ValueError:
+            # An unknown host may name the actual subject and the allowed URL
+            # its blocker. Refuse inference instead of silently selecting one.
+            return None
+        found.add((parsed.host, parsed.owner, parsed.repo, parsed.number))
 
     # Exactly one subject, or nothing. Ambiguity is not resolved by preferring
     # the first mention: reading order does not tell which PR the loop owns, and
@@ -147,7 +143,7 @@ def infer(text: str) -> Target | None:
     if len(found) != 1:
         return None
 
-    owner, repo, number = found.pop()
+    host, owner, repo, number = found.pop()
     # A SHORTHAND naming a different pull request makes the URL ambiguous rather
     # than authoritative. The common shape is a loop whose own subject is written
     # informally and whose BLOCKER is pasted as a link -- "drive owner/name#42;
@@ -184,12 +180,12 @@ def infer(text: str) -> Target | None:
         # host. The pin stops an ambient ``GH_HOST`` from re-pointing the slug at
         # a different server, where a same-numbered pull request could be merged
         # and retire a watch on a live one.
-        "host": _PUBLIC_HOST,
+        "host": host,
     }
     return Target(
         kind=GH_PR,
         subject=f"{slug}#{number}",
-        host_key=_PUBLIC_HOST,
+        host_key=host,
         # known_reds is deliberately absent: inference cannot know which reds
         # are inherited from the base branch, and inventing that list would
         # either suppress a real failure or wake on a known one. The woken agent

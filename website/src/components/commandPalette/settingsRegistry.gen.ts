@@ -1319,6 +1319,16 @@ export const SETTINGS_REGISTRY: SettingEntry[] =
     "occurrence": 1
   },
   {
+    "id": "connections.allowed-github-hosts",
+    "label": "Allowed GitHub hosts",
+    "labelKey": "githubMonitoring.hosts",
+    "description": "One hostname per line, without https:// or a path. Keep github.com if needed. Authenticate on the gateway with gh auth login --hostname HOST. This setting does not configure the GitHub MCP connection.",
+    "tab": "connections",
+    "type": "input",
+    "occurrence": 1,
+    "configKey": "monitoring.github_hosts"
+  },
+  {
     "id": "connections.client-id",
     "label": "Client ID",
     "labelKey": "pages.settings.connectionsPanel.client_id",

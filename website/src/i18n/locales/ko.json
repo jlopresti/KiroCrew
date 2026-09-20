@@ -1,4 +1,10 @@
 {
+  "githubMonitoring": {
+    "title": "GitHub PR 모니터링",
+    "hosts": "허용된 GitHub 호스트",
+    "help": "한 줄에 호스트 이름 하나를 입력하고 https:// 또는 경로는 제외하세요. 필요한 경우 github.com을 유지하세요. 게이트웨이에서 gh auth login --hostname HOST로 인증하세요. 이 설정은 GitHub MCP 연결을 구성하지 않습니다.",
+    "invalid": "포트나 와일드카드 없이 호스트 이름만 입력하세요."
+  },
   "appChatLaunch": {
     "unsent": "{{error}}\n\n메시지가 전송되지 않았습니다. 복사한 후 다시 시도하세요:\n{{message}}",
     "cancelled": "세션을 전환하여 전송이 취소되었습니다.",

@@ -6,6 +6,11 @@ Kiro Crew connects to the remote GitHub MCP server at `https://api.githubcopilot
 
 ## Before you start
 
+With `agent.acp_backend=codex`, GitHub Connections does not need Kiro CLI.
+Kiro Crew handles the browser callback at the same URI below and stores the
+grant in its encrypted vault. After connecting, start a new chat so Codex loads
+the authorization. Other providers still use their own existing runtime flow.
+
 - A GitHub account. If the repositories you want to reach belong to an organization, you also need to know whether that organization has "OAuth app access restrictions" turned on (it is on by default for new organizations). If it is, an organization owner must approve the app before it can read organization data; plan for that hand-off.
 - A running Kiro Crew gateway with the dashboard open, so you can copy the redirect URI from the card and paste credentials back in.
 - Decide who owns the registration. An OAuth app can be created under your personal account or under any organization where you have admin rights. A registration owned by the organization is automatically trusted when the organization enables OAuth app access restrictions.
@@ -23,7 +28,7 @@ Kiro Crew connects to the remote GitHub MCP server at `https://api.githubcopilot
 7. Optionally fill in **Application description**. Users see it on the authorization page.
 8. In **Authorization callback URL**, type exactly `http://127.0.0.1:48101/callback`. Section 2 explains why.
 9. Leave **Enable Device Flow** unchecked. Kiro Crew uses the browser redirect flow.
-10. **Expire user access tokens** is checked by default. Leave it checked: GitHub then issues an 8-hour access token plus a refresh token that expires after six months without use. If your Kiro Crew build predates refresh-token support for this provider, uncheck it; the runbook does not know your build, so check the release notes.
+10. A plain OAuth App does not have the GitHub App setting **Expire user access tokens**. If you see that setting, you are registering a GitHub App instead; its permissions and installation requirements differ as described below.
 11. Click **Register application**.
 12. On the app page, copy the **Client ID**. Then click **Generate a new client secret**, and copy the secret immediately; GitHub shows it only once.
 
@@ -94,7 +99,7 @@ Revoking: the user opens **Settings → Applications → Authorized OAuth Apps**
 
 - No read-only scope for private repositories: `repo` is read and write. Use the `/readonly` server URL to constrain tools.
 - `client_secret` is required at token exchange ("Required" in GitHub's table) even when PKCE is used; the app is a confidential client, so the secret must live on the gateway.
-- Expiring tokens: with the default setting, access tokens last 8 hours and refresh tokens 6 months without use. If Kiro Crew is not run for six months, the user must reconnect.
+- GitHub App expiring tokens are distinct from plain OAuth App grants. With Codex, refresh runs before a new session or a Connections Test; an already-running session must be restarted after its in-memory token expires.
 - GitHub limits a user/app/scope combination to ten live tokens and ten new tokens per hour; repeated reconnects can hit this.
 - The GitHub discovery documents are in public preview and "subject to change". Kiro Crew should follow the `WWW-Authenticate` `resource_metadata` URL rather than hard-coding endpoints, as GitHub's host guide recommends.
 - Organization approval is per organization; in a multi-organization enterprise an OAuth App cannot be approved at the enterprise level (only GitHub Apps can).

@@ -1,4 +1,10 @@
 {
+  "githubMonitoring": {
+    "title": "GitHub PR 监控",
+    "hosts": "允许的 GitHub 主机",
+    "help": "每行输入一个主机名，不含 https:// 或路径。按需保留 github.com。在网关上使用 gh auth login --hostname HOST 进行身份验证。此设置不会配置 GitHub MCP 连接。",
+    "invalid": "仅输入主机名，不含端口或通配符。"
+  },
   "appChatLaunch": {
     "unsent": "{{error}}\n\n消息未发送。复制以下内容后重试：\n{{message}}",
     "cancelled": "你切换了会话，发送已取消。",

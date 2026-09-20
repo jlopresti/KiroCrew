@@ -73,6 +73,11 @@ in `irq.run`; `test_terminal_wins_over_an_open_window` and
 
 ## State identity and recovery
 
+The GitHub PR probe validates explicit hosts against `monitoring.github_hosts`
+on each identity read. Enterprise identities include the host before the
+repository slug, so the same PR number on two servers cannot share probe state.
+Public-host and host-omitted legacy identity formats remain stable.
+
 `state_path` creates one state path for each subject and cron job. It folds the
 human-readable path components and includes the unfolded identity in its digest.
 This keeps watches of the same subject independent and prevents folded subject

@@ -3083,7 +3083,11 @@ def _register_connections_warm_lifecycle(app: web.Application, state: DashboardS
     lists; it resolves the import only when a gateway is already stopping.
     """
 
+    app["connections_native_oauth"] = {}
+
     async def _connections_warm_shutdown(_app: web.Application) -> None:
+        for flow in app["connections_native_oauth"].values():
+            await flow.cancel()
         try:
             from kiro_crew.connections.warm import shutdown_warm_mint
 

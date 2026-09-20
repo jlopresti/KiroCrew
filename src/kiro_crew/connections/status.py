@@ -387,7 +387,11 @@ def _grant_presence_map(providers: list[Provider]) -> dict[str, bool | None]:
     }
 
 
-async def collect_connection_statuses() -> list[ConnectionStatus]:
+async def collect_connection_statuses(
+    *,
+    grant_overrides: dict[str, bool | None] | None = None,
+    mint_overrides: dict[str, str] | None = None,
+) -> list[ConnectionStatus]:
     """Authorization verdict + first-connect time for every visible provider.
 
     Reachability is intentionally not probed here -- see the module docstring.
@@ -416,6 +420,9 @@ async def collect_connection_statuses() -> list[ConnectionStatus]:
             unclaimed.add(str(provider["slug"]))
 
     grants = await asyncio.to_thread(_grant_presence_map, providers)
+    grants.update(grant_overrides or {})
+    mint_states.update(mint_overrides or {})
+    unclaimed.difference_update(mint_overrides or {})
     client_configured = await asyncio.to_thread(_client_config_map, providers)
 
     statuses: list[ConnectionStatus] = []

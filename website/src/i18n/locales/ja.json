@@ -1,4 +1,10 @@
 {
+  "githubMonitoring": {
+    "title": "GitHub PR の監視",
+    "hosts": "許可する GitHub ホスト",
+    "help": "1 行に 1 ホスト名を入力し、https:// やパスは含めないでください。必要なら github.com を残してください。ゲートウェイで gh auth login --hostname HOST を実行して認証します。この設定は GitHub MCP 接続には適用されません。",
+    "invalid": "ポートやワイルドカードを含めず、ホスト名のみを入力してください。"
+  },
   "appChatLaunch": {
     "unsent": "{{error}}\n\nメッセージは未送信です。コピーして再試行してください：\n{{message}}",
     "cancelled": "セッションを切り替えたため、送信をキャンセルしました。",

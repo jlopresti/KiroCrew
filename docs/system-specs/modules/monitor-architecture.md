@@ -203,9 +203,10 @@ subject yet.** `GitHubPullRequestProvider.probe` spends one GraphQL document per
 evidence kind per chunk of at most 25 subjects, so a tick of any size up to that
 bound costs three requests instead of three per subject, and each further chunk
 adds three. A read the GraphQL point budget REFUSES costs more than that, because
-the fallback below is per subject rather than per chunk. It carries the (host,
-credential) rule as a check rather than as a grouping pass: the credential is the
-call's own argument, and a chunk is refused if it names two hosts. The
+the fallback below is per subject rather than per chunk. Subjects are grouped by
+their allowed `monitoring.github_hosts` hostname before chunking. Each query
+pins that host so `gh` selects its credentials for that server; a defensive check
+also refuses a chunk if it names two hosts. The
 other four adapters still loop internally and declare so in their own docstrings.
 What is missing is above the probe, not inside it: the in-session driver arms one
 `asyncio` task per loop in `autonudge.py`, so a tick structurally sees one
@@ -255,11 +256,9 @@ Rules:
 - A probe that *can* batch **must**. A probe that genuinely cannot implements the
   plural signature and loops internally, so the caller never encodes the
   difference.
-- One query per (host, credential) per tick. Subjects sharing a credential share
-  the query. An adapter satisfies this with a CHECK, not with a grouping pass: a
-  pass that sorts subjects into per-host queries is machinery for a case its own
-  target gate cannot construct, so it would ship unexercised, while a check is
-  exercised on every call and fails closed the day a second host is accepted. A
+- One query per (host, credential) per tick. Subjects sharing a host and credential
+  share the query. GitHub groups public and configured Enterprise hosts separately
+  and also validates each chunk's host identity. A
   read whose failures are separate is a separate query: the GitHub
   adapter keeps its load-bearing primary read apart from its two supplemental
   ones, because a document that selects the check rollup hands its lifecycle

@@ -372,8 +372,13 @@ def codex_projection(
             )
             continue
         kept.append(element)
+    from kiro_crew.connections.github_oauth import project_headers
+
     out: list[dict[str, Any]] = codex_elements(
-        kept, session_key=session_key, channel_id=channel_id, session_token=session_token
+        project_headers(kept),
+        session_key=session_key,
+        channel_id=channel_id,
+        session_token=session_token,
     )
     for stub in stub_elements:
         if not isinstance(stub, Mapping):
