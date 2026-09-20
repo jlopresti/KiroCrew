@@ -1,7 +1,8 @@
 """Cross-platform Kiro CLI readiness detection.
 
-The public KiroCrew provider is KiroACP-only, so a healthy, authenticated
-``kiro-cli`` is a hard runtime prerequisite. This module's job is to answer one
+The Kiro and KAS backends require a healthy, authenticated ``kiro-cli``.
+Independent ACP backends do not require Kiro installation or sign-in.
+This module's job is to answer one
 question about the gateway host: **is there a Kiro CLI that runs, and is it
 signed in?** It answers that by running the CLI's own read-only probes
 (``--version``, then ``whoami``) inside the OS sandbox.
@@ -54,7 +55,13 @@ from typing import Any
 from kiro_crew import hooks, identity_stores, platform_compat
 from kiro_crew._sqlite_compat import sqlite3
 from kiro_crew.agent_files import AGENT_FILENAME, LITE_AGENT_FILENAME
+from kiro_crew.agent_sdk.backends import (
+    ACP_BACKEND_KAS,
+    ACP_BACKEND_KIRO,
+    resolve_selected_backend,
+)
 from kiro_crew.atomic_write import atomic_write
+from kiro_crew.config import KiroCrewConfig
 from kiro_crew.config.loader import CRED_KIRO_API_KEY, read_env_file_credential
 from kiro_crew.config.paths import config_dir
 from kiro_crew.executors import kiro_spawn_executor
@@ -73,6 +80,17 @@ from kiro_crew.sandbox import (
 from kiro_crew.security import redact_credentials, redact_exfiltration_urls
 
 logger = logging.getLogger(__name__)
+
+
+def configured_kiro_cli_required() -> bool:
+    """Read the selected backend's Kiro dependency, including live switches.
+
+    Call off the event loop: config loading can read disk. Normalize through the
+    selection registry so an invalid selection keeps the default Kiro checks.
+    """
+    backend = resolve_selected_backend(KiroCrewConfig.load().agent.acp_backend)
+    return backend in (ACP_BACKEND_KIRO, ACP_BACKEND_KAS)
+
 
 # Dashboard-facing text for a spec-repair arm that reported success while the
 # overlay still lists missing specs (the no-op-is-failure rule documented on
@@ -428,6 +446,8 @@ class PrerequisiteStatus:
     installed: bool = False
     authenticated: bool = False
     ready: bool = False
+    # False means Kiro is irrelevant to the selected backend, not authenticated.
+    required: bool = True
     # Something on the host needs an owner-driven repair before ``ready`` can go
     # true. Only the agent-spec overlay sets it — a missing CLI is NOT a repair
     # (the user installs it from OFFICIAL_INSTALL_DOCS_URL, which Kiro Crew has no
@@ -2517,6 +2537,8 @@ class KiroPrerequisiteService:
             try:
                 if self._warm_up_delay > 0:
                     await asyncio.sleep(self._warm_up_delay)
+                if not await asyncio.to_thread(configured_kiro_cli_required):
+                    return
                 await self._probe()
             except asyncio.CancelledError:
                 raise
@@ -2553,6 +2575,15 @@ class KiroPrerequisiteService:
         :meth:`verified_ready`, whose callers act irreversibly and carry their own
         freshness bound.
         """
+
+        if not await asyncio.to_thread(configured_kiro_cli_required):
+            # Do not overwrite the Kiro latch or its persistent setup marker:
+            # switching back to Kiro must still verify its own prerequisites.
+            result = asdict(
+                PrerequisiteStatus(platform=_platform_label(self._platform), required=False)
+            )
+            result["operation"] = legacy_idle_operation()
+            return result
 
         if force and coalesce and self._clock() - self._last_probe_at < _FORCED_PROBE_FLOOR_SECS:
             force = False

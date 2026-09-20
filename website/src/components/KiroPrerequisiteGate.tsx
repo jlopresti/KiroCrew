@@ -36,7 +36,7 @@ const QUERY_KEY = ['kiro-prerequisite'] as const
 export function kiroPrerequisiteRefetchInterval(
   status: KiroPrerequisiteStatus | undefined,
 ): number | false {
-  if (status?.ready) return 30_000
+  if (status?.required === false || status?.ready) return 30_000
   if (status && status.setup_allowed === false) return 3_000
   if (kiroPrerequisiteIsBlocking(status)) return 5_000
   return 30_000
@@ -56,7 +56,7 @@ export function kiroPrerequisiteRefetchInterval(
 export function kiroPrerequisiteIsBlocking(
   status: KiroPrerequisiteStatus | undefined,
 ): boolean {
-  if (!status || status.ready) return false
+  if (!status || status.required === false || status.ready) return false
   // A non-owner cannot probe and is shown the "owner must finish setup" screen.
   if (status.setup_allowed === false) return false
   return !status.initial_setup_complete
@@ -911,7 +911,7 @@ export default function KiroPrerequisiteGate({ children }: { children: ReactNode
   // load can classify the user before (or without) a successful status
   // response. `ready` implies setup is done, and covers gateways that report
   // readiness without the first-run bit.
-  const setupComplete = !!statusQuery.data
+  const setupComplete = !!statusQuery.data && statusQuery.data.required !== false
     && (statusQuery.data.initial_setup_complete || statusQuery.data.ready)
   useEffect(() => {
     if (setupComplete) safeSetItem(SETUP_COMPLETE_KEY, '1')
@@ -964,7 +964,7 @@ export default function KiroPrerequisiteGate({ children }: { children: ReactNode
       <SetupStatusError message={message} retrying={retrying} onRetry={retryStatus} />
     )
   }
-  if (prerequisite.ready) {
+  if (prerequisite.required === false || prerequisite.ready) {
     return <>{children}</>
   }
   const status = prerequisite

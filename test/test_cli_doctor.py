@@ -23,6 +23,22 @@ from kiro_crew import cli_doctor, cron
 from kiro_crew.agent_sdk.backends import ACP_BACKEND_PI
 
 
+def test_codex_auth_diagnostics_do_not_probe_or_request_kiro(monkeypatch, capsys):
+    from kiro_crew.config import KiroCrewConfig
+
+    config = KiroCrewConfig()
+    config.agent.acp_backend = "codex"
+    monkeypatch.setattr(KiroCrewConfig, "load", lambda: config)
+    probe = MagicMock(side_effect=AssertionError("Codex does not need Kiro sign-in"))
+    monkeypatch.setattr(cli_doctor, "_kiro_cli_signed_in", probe)
+    cli_doctor._doctor_agent_auth()
+    output = capsys.readouterr().out
+    assert "codex auth:" in output
+    assert "kiro auth:" not in output
+    assert "kiro-cli login" not in output
+    probe.assert_not_called()
+
+
 class TestManagedServicePolicyDoctor:
     def test_no_service_is_silent(self, monkeypatch, capsys):
         monkeypatch.setattr(

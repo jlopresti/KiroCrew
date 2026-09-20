@@ -38,7 +38,7 @@ Builds use plain `pip` + `npm`/Vite + `pytest`, driven by the repo-root
 |-------------|------------|-------|
 | **Python** | Backend | `>= 3.12` (`requires-python` in `pyproject.toml`; `make build` provisions a 3.12 `.venv` by default) |
 | **Node.js + npm** | Building the dashboard | `>= 22` (`website/package.json` `engines`; Node 24 LTS recommended); on x86_64 Amazon Linux 2, the glibc-217 fallback installs Node 24 because official builds need a newer glibc (no glibc-217 arm64 build is available) |
-| **`kiro-cli`** | Driving the LLM | Required; see below |
+| **Agent backend** | Driving the LLM | `kiro-cli` for Kiro/KAS, or an independent backend such as `codex-acp`; see below |
 
 Node is only needed to *build* the dashboard. The prebuilt wheel, the DMG, the
 AppImage, and the Linux `.deb` / `.rpm` packages all ship the dashboard already
@@ -63,6 +63,11 @@ page detects the missing prerequisite, links to the official Kiro CLI setup
 guide, and shows the login commands to run yourself. Kiro Crew does not download
 the CLI or start its login flow. `kirocrew doctor` reports both the binary and
 the login state.
+
+To use Codex without installing or signing in to Kiro, follow the
+[Codex backend configuration](../../src/kiro_crew/docs/configuration.md#acp-backend).
+Select `agent.acp_backend=codex` before opening the dashboard. Kiro's setup
+screen and background readiness probes do not apply to that selection.
 
 ### Embeddings: nothing to install
 

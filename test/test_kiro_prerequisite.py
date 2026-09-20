@@ -149,6 +149,56 @@ async def _wait_for_operation(service: KiroPrerequisiteService) -> None:
 
 
 class TestKiroPrerequisiteHelpers:
+    @pytest.mark.parametrize(
+        ("backend", "required"),
+        [("", True), ("kas", True), ("codex", False), ("claude", False), ("typo", True)],
+    )
+    def test_kiro_dependency_follows_selected_backend(self, monkeypatch, backend, required):
+        config = SimpleNamespace(agent=SimpleNamespace(acp_backend=backend))
+        monkeypatch.setattr(prerequisite_module.KiroCrewConfig, "load", lambda: config)
+        assert prerequisite_module.configured_kiro_cli_required() is required
+
+    @pytest.mark.asyncio
+    async def test_codex_first_run_never_probes_kiro_or_marks_its_setup_complete(
+        self, tmp_path, monkeypatch
+    ):
+        config = SimpleNamespace(agent=SimpleNamespace(acp_backend="codex"))
+        monkeypatch.setattr(prerequisite_module.KiroCrewConfig, "load", lambda: config)
+        service = KiroPrerequisiteService(
+            platform_name="darwin",
+            home=tmp_path,
+            data_home=tmp_path / "crew",
+            environ={"PATH": ""},
+            audit_writer=_no_audit,
+            warm_up_delay=0,
+        )
+        probe = AsyncMock(side_effect=AssertionError("Codex must not probe Kiro"))
+        overlay = AsyncMock(side_effect=AssertionError("Codex must not validate Kiro specs"))
+        monkeypatch.setattr(service, "_probe", probe)
+        monkeypatch.setattr(service, "_agent_spec_overlay", overlay)
+        try:
+            await asyncio.wait_for(service.warm_up(), timeout=5)
+            for force, coalesce in [(False, False), (True, False), (True, True)]:
+                snapshot = await service.snapshot(force=force, coalesce=coalesce)
+                assert snapshot["required"] is False
+                assert snapshot["ready"] is False
+                assert snapshot["authenticated"] is False
+                assert snapshot["initial_setup_complete"] is False
+            probe.assert_not_called()
+            overlay.assert_not_called()
+            assert not service._setup_marker.exists()
+
+            # A live switch back must recover the ordinary Kiro first-run gate.
+            config.agent.acp_backend = ""
+            monkeypatch.setattr(service, "_probe", AsyncMock())
+            monkeypatch.setattr(service, "_agent_spec_overlay", AsyncMock(side_effect=lambda s: s))
+            snapshot = await service.snapshot(force=True)
+            assert snapshot["required"] is True
+            assert snapshot["ready"] is False
+            service._probe.assert_awaited_once()
+        finally:
+            await service.close()
+
     def test_identity_file_lockdown_precedes_content(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
@@ -3428,6 +3478,33 @@ class TestKiroPrerequisiteWorkflow:
 
 
 class TestKiroPrerequisiteHandlers:
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("user", ["test-user", "member"])
+    async def test_codex_does_not_require_owner_kiro_setup(self, tmp_path, monkeypatch, user):
+        config = SimpleNamespace(agent=SimpleNamespace(acp_backend="codex"))
+        monkeypatch.setattr(prerequisite_module.KiroCrewConfig, "load", lambda: config)
+        service = KiroPrerequisiteService(
+            home=tmp_path,
+            data_home=tmp_path / "crew",
+            environ={"PATH": ""},
+            audit_writer=_no_audit,
+        )
+        probe = AsyncMock(side_effect=AssertionError("No Kiro probe for Codex"))
+        monkeypatch.setattr(service, "_probe", probe)
+        try:
+            async with TestClient(
+                TestServer(self._app(service, app_claim="", user=user))
+            ) as client:
+                response = await client.get("/api/kiro-prerequisite?refresh=explicit")
+                assert response.status == 200
+                body = await response.json()
+                assert body["required"] is False
+                assert body["ready"] is False
+                assert body["initial_setup_complete"] is False
+                probe.assert_not_called()
+        finally:
+            await service.close()
+
     @staticmethod
     def _app(
         service: KiroPrerequisiteService,

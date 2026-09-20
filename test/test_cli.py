@@ -4183,6 +4183,17 @@ class TestCliLoopbackAddress:
 class TestEnsurePrerequisites:
     """Tests for _ensure_prerequisites return value."""
 
+    def test_codex_does_not_request_kiro_install(self, monkeypatch, capsys):
+        from kiro_crew.cli_setup import _ensure_prerequisites
+        from kiro_crew.config import KiroCrewConfig
+
+        config = KiroCrewConfig()
+        config.agent.acp_backend = "codex"
+        monkeypatch.setattr(KiroCrewConfig, "load", lambda: config)
+        with patch("kiro_crew.cli_setup.shutil.which", return_value=None):
+            assert _ensure_prerequisites() is True
+        assert "kiro-cli" not in capsys.readouterr().out
+
     def test_returns_true_when_all_satisfied(self):
         from kiro_crew.cli_setup import _ensure_prerequisites
 
@@ -4203,6 +4214,29 @@ class TestEnsurePrerequisites:
 
         with patch("kiro_crew.cli_setup.shutil.which", return_value=None):
             assert _ensure_prerequisites() is True
+
+
+class TestDoctorIndependentBackend:
+    def test_codex_doctor_never_checks_kiro_auth(self, tmp_path, monkeypatch, capsys):
+        from kiro_crew.config import KiroCrewConfig
+
+        config = KiroCrewConfig()
+        config.agent.acp_backend = "codex"
+        monkeypatch.setattr(KiroCrewConfig, "load", lambda: config)
+        with (
+            patch("kiro_crew.cli_doctor._doctor_headless_auth") as headless,
+            patch("kiro_crew.cli_doctor._kiro_cli_signed_in") as signed_in,
+            patch("kiro_crew.cli_doctor.shutil.which", return_value=None),
+        ):
+            TestDoctorEmbeddings._run_doctor(
+                tmp_path, monkeypatch, runtime_ok=True, model_present=True
+            )
+        output = capsys.readouterr().out
+        assert "codex auth:" in output
+        assert "Install kiro-cli" not in output
+        assert "kiro-cli login" not in output
+        headless.assert_not_called()
+        signed_in.assert_not_called()
 
 
 class TestDoctorStaleProjectDir:

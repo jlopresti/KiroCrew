@@ -1595,7 +1595,10 @@ def _backend_policy_label(backend: str) -> str:
 
 
 def _doctor_agent_auth() -> None:
-    """One sign-in row per selectable harness, projected from its declaration.
+    """Sign-in rows projected from each selectable harness's declaration.
+
+    Kiro-family rows are omitted when an independent backend is selected: those
+    optional accounts must not trigger Kiro probes or a Kiro sign-in remedy.
 
     Replaces four per-provider answers that could disagree: an inline
     ``kiro-cli whoami`` row, a Claude report with no auth line at all, no codex
@@ -1633,7 +1636,12 @@ def _doctor_agent_auth() -> None:
     """
     from kiro_crew.acp_backends import POLICY_ID_BY_BACKEND, selectable_backend_values
     from kiro_crew.agent_sdk import declaration_for, entitlement_label, signs_in_separately
-    from kiro_crew.agent_sdk.backends import ACP_BACKENDS_HOST_AUTH_CALLBACK
+    from kiro_crew.agent_sdk.backends import (
+        ACP_BACKEND_KAS,
+        ACP_BACKEND_KIRO,
+        ACP_BACKENDS_HOST_AUTH_CALLBACK,
+    )
+    from kiro_crew.kiro_prerequisite import configured_kiro_cli_required
 
     try:
         backends = selectable_backend_values()
@@ -1652,7 +1660,10 @@ def _doctor_agent_auth() -> None:
     vault_detail: str | None = None
     vault_probed = False
 
+    kiro_required = configured_kiro_cli_required()
     for backend in backends:
+        if not kiro_required and backend in (ACP_BACKEND_KIRO, ACP_BACKEND_KAS):
+            continue
         try:
             declaration = declaration_for(backend)
             separate = signs_in_separately(backend)
@@ -4153,18 +4164,23 @@ def _doctor(platform_boot_error: "Exception | None" = None, bundle: bool = False
 
     # ── Dependencies ──
     print("Dependencies")
-    # kiro-cli is the DEFAULT agent backend and the floor every deployment keeps.
+    # Only Kiro-family deployments need the Kiro binary and host sign-in.
     # Claude Code is selectable too (``BASELINE_SELECTABLE_BACKENDS``), so it is
     # reported as a real optional backend -- present or absent -- rather than only
     # when it happens to be installed. The verdict comes from the same owner the
     # dashboard asks, so doctor and the panel cannot disagree.
-    kiro = shutil.which(KIRO_CLI_BIN)
-    if kiro:
-        print(f"  kiro-cli:    ✅ {kiro}")
-        _doctor_headless_auth(issues)
-    else:
-        print("  kiro-cli:    ⏭  not found (the default agent backend)")
-        print("               Install kiro-cli per its docs, then: kiro-cli login")
+    from kiro_crew.kiro_prerequisite import configured_kiro_cli_required
+
+    kiro_required = configured_kiro_cli_required()
+    kiro: str | None = None
+    if kiro_required:
+        kiro = shutil.which(KIRO_CLI_BIN)
+        if kiro:
+            print(f"  kiro-cli:    ✅ {kiro}")
+            _doctor_headless_auth(issues)
+        else:
+            print("  kiro-cli:    ⏭  not found (the default agent backend)")
+            print("               Install kiro-cli per its docs, then: kiro-cli login")
 
     _doctor_claude_backend()
     # After the install rows, and per harness rather than per provider: sign-in is a
@@ -4863,7 +4879,7 @@ def _doctor(platform_boot_error: "Exception | None" = None, bundle: bool = False
             print(f"  kiro-cli:    ✅ {ver}")
         else:
             print("  kiro-cli:    ⚠️  exits with error (optional backend)")
-    else:
+    elif kiro_required:
         print("  kiro-cli:    ⏭  skipped (not installed)")
 
     # Check if gateway is running — connect to 127.0.0.1 (loopback)

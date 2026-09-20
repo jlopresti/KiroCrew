@@ -30,12 +30,50 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from chat_test_helpers import _make_ready_kiro_prerequisite
 
+from kiro_crew.config import KiroCrewConfig
 from kiro_crew.dashboard import kiro_readiness
 from kiro_crew.dashboard.handlers import agents, sessions
 from kiro_crew.kiro_prerequisite import KiroPrerequisiteService
 
 _RESOLVE_TARGET = "kiro_crew.acp.client._resolve_kiro_bin_for_spawn"
 _FAKE_KIRO_BIN = "/usr/bin/kiro-cli"
+
+
+@pytest.mark.asyncio
+async def test_codex_does_not_require_kiro_for_models_usage_or_reruns(monkeypatch):
+    config = KiroCrewConfig()
+    config.agent.acp_backend = "codex"
+    monkeypatch.setattr(KiroCrewConfig, "load", lambda: config)
+    request = _request(_make_signed_out_kiro_prerequisite())
+    verify = AsyncMock(side_effect=AssertionError("No Kiro readiness check for Codex"))
+    monkeypatch.setattr(kiro_readiness, "kiro_verified_ready", verify)
+    fetch = AsyncMock(side_effect=AssertionError("No Kiro usage fetch for Codex"))
+    monkeypatch.setattr(sessions, "_fetch_usage_bg", fetch)
+    monkeypatch.setattr(sessions, "_usage_cache_ts", 0.0)
+    monkeypatch.setattr(sessions, "_usage_cache", {"credits": "previous Kiro account"})
+    with patch(_RESOLVE_TARGET, AsyncMock()) as resolve:
+        assert await kiro_readiness.reject_if_kiro_unverified(request) is None
+        models = await agents.api_models(request)
+        usage = await sessions.api_sessions_usage(request)
+    assert models.status == 200
+    assert usage.status == 200
+    assert json.loads(usage.body) == {"usage": None}
+    verify.assert_not_called()
+    resolve.assert_not_called()
+    fetch.assert_not_called()
+    assert not request.app["state"]._background_tasks
+
+
+@pytest.mark.asyncio
+async def test_explicit_kiro_spawn_remains_guarded_after_backend_switch(monkeypatch):
+    config = KiroCrewConfig()
+    config.agent.acp_backend = "codex"
+    monkeypatch.setattr(KiroCrewConfig, "load", lambda: config)
+    response = await kiro_readiness.reject_if_kiro_unverified(
+        _request(_make_signed_out_kiro_prerequisite()), kiro_spawn=True
+    )
+    assert response is not None
+    assert response.status == 503
 
 
 @pytest.fixture(autouse=True)

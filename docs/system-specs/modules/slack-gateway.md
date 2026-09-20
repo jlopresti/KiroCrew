@@ -2,6 +2,10 @@
 
 ## Overview
 
+The boot-time Kiro CLI version probe runs only when the selected backend is
+Kiro or KAS. Independent backends such as Codex neither resolve nor spawn Kiro
+for this check; they use their own adapter and sign-in requirements.
+
 The Slack integration (`kiro_crew/slack/`) connects KiroCrew to Slack via Socket Mode. DMs are routed through ACP to kiro-cli with real-time streaming and interactive tool approval.
 
 Independently scheduled agent runs admit their exact execution key as durable

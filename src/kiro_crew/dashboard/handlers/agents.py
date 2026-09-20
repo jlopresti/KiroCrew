@@ -2226,7 +2226,7 @@ async def api_models(request: web.Request) -> web.Response:
     # opened a browser window every 8s indefinitely. The 503 is the same
     # degraded response the timeout/unresolved branches already return, so the
     # client contract is unchanged; only the subprocess is skipped.
-    blocked = await reject_if_kiro_unverified(request)
+    blocked = await reject_if_kiro_unverified(request, kiro_spawn=True)
     if blocked is not None:
         return blocked
     kiro_bin: str | None = None

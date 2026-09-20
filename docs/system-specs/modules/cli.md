@@ -1009,6 +1009,11 @@ Each step checks if the tool is already installed and skips if present.
 
 ## Doctor Checks
 
+Kiro installation guidance in `setup` and Kiro binary/authentication checks in
+`doctor` apply only when `agent.acp_backend` selects Kiro or KAS. Selecting Codex
+does not prompt the operator to install or authenticate Kiro. The backend's own
+install and sign-in diagnostics remain separate.
+
 1. `kiro-cli` binary in PATH
 2. Source directory (Kiro Crew checkout) and git repo
 3. Agent config installed

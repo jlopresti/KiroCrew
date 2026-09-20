@@ -21,12 +21,13 @@ latched value can be arbitrarily stale. That splits the callers in two:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 
 from aiohttp import web
 
-from kiro_crew.kiro_prerequisite import KiroPrerequisiteService
+from kiro_crew.kiro_prerequisite import KiroPrerequisiteService, configured_kiro_cli_required
 
 logger = logging.getLogger(__name__)
 
@@ -215,7 +216,9 @@ def _service(request: web.Request) -> object:
     return service
 
 
-async def reject_if_kiro_unverified(request: web.Request) -> web.Response | None:
+async def reject_if_kiro_unverified(
+    request: web.Request, *, kiro_spawn: bool = False
+) -> web.Response | None:
     """Return 503 for the endpoints that must fail closed on a stale latch.
 
     Two classes qualify, both because the ACP attempt cannot be their authority:
@@ -247,6 +250,10 @@ async def reject_if_kiro_unverified(request: web.Request) -> web.Response | None
     browser-opening spawn), and only these paths pay for the re-probe.
     """
 
+    # Provider-independent operations use the selected backend. A caller about to
+    # spawn Kiro explicitly must still verify Kiro even if selection just changed.
+    if not kiro_spawn and not await asyncio.to_thread(configured_kiro_cli_required):
+        return None
     if await kiro_verified_ready(_service(request)):
         _clear_refusal_warning()
         return None

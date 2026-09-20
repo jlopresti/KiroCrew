@@ -145,6 +145,20 @@ def _probe_proc(communicate: Any, *, returncode: int = 0) -> MagicMock:
 class TestWarnIfKiroCliOutdated:
     """The boot-time kiro-cli version probe never raises and never hangs."""
 
+    @pytest.mark.asyncio
+    async def test_codex_never_probes_kiro(self, monkeypatch):
+        config = KiroCrewConfig()
+        config.agent.acp_backend = "codex"
+        monkeypatch.setattr(KiroCrewConfig, "load", lambda: config)
+        orch = _make_orchestrator()
+        with (
+            patch("kiro_crew.kiro_cli.resolve_kiro_cli") as resolve,
+            patch("asyncio.create_subprocess_exec") as spawn,
+        ):
+            await orch._warn_if_kiro_cli_outdated()
+        resolve.assert_not_called()
+        spawn.assert_not_called()
+
     @pytest.fixture(autouse=True)
     def _resolvable_kiro_cli(self):
         """Every arm below exercises the spawn, which now needs a resolved path.

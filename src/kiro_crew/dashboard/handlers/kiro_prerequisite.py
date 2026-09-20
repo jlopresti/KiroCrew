@@ -169,6 +169,7 @@ async def api_kiro_prerequisite_status(request: web.Request) -> web.Response:
             "installed": False,
             "authenticated": False,
             "ready": bool(snapshot.get("ready")),
+            "required": snapshot.get("required", True),
             "initial_setup_complete": bool(snapshot.get("initial_setup_complete")),
             "repair_required": False,
             "docs_url": OFFICIAL_INSTALL_DOCS_URL,

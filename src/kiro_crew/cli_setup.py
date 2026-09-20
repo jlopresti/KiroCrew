@@ -131,7 +131,7 @@ def _fix_shell_profiles() -> None:
 def _ensure_prerequisites() -> bool:
     """Report on optional prerequisites resolved from PATH.
 
-    The public build's agent backend is ``kiro-cli``. This performs no installs
+    Kiro CLI is required only for the Kiro and KAS backends. This performs no installs
     and never blocks setup — it only prints guidance for tooling that is missing
     from PATH. Always returns True so setup proceeds.
     """
@@ -151,8 +151,9 @@ def _ensure_prerequisites() -> bool:
             f"  ⚠️  node not found on PATH — install Node.js >= {MIN_NODE_MAJOR} from https://nodejs.org\n"
         )
 
-    # kiro-cli is the agent backend. Note its absence so the user can install it.
-    if not shutil.which(KIRO_CLI_BIN):
+    from kiro_crew.kiro_prerequisite import configured_kiro_cli_required
+
+    if configured_kiro_cli_required() and not shutil.which(KIRO_CLI_BIN):
         _header()
         print(
             "  ℹ️  kiro-cli not found on PATH — install it (the agent backend) "

@@ -1083,11 +1083,17 @@ async def _fetch_usage_bg() -> None:
 
 async def api_sessions_usage(request: web.Request) -> web.Response:
     """GET /api/sessions/usage — cached kiro credit usage (background refresh)."""
+    from kiro_crew.kiro_prerequisite import configured_kiro_cli_required
+
+    if not await asyncio.to_thread(configured_kiro_cli_required):
+        # The cache belongs to the Kiro account, not the newly selected backend.
+        # Never schedule a Kiro CLI scrape for an independent agent.
+        return web.json_response({"usage": None})
     # Same browser-storm guard as api_models: the /usage scrape shells out to
     # `kiro-cli chat --no-interactive ... /usage`, which auto-opens a browser
     # login while signed out. This endpoint is polled every 30s by the top-bar
     # credit pill, so an unauthenticated gateway spawned a browser every 30s.
-    blocked = await reject_if_kiro_unverified(request)
+    blocked = await reject_if_kiro_unverified(request, kiro_spawn=True)
     if blocked is not None:
         return blocked
     now = time.time()

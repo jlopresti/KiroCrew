@@ -2418,7 +2418,23 @@ which fades as focus moves; a pane outside split view is never dimmed.
 `KiroPrerequisiteGate` wraps the main dashboard route (the independent
 `/worlds-popout` route is not gated). `DashboardBootstrap` mounts the proactive
 auth-cookie refresh scheduler outside this gate, so a stale access cookie can
-still refresh while the dashboard body is blocked. On a new gateway it:
+still refresh while the dashboard body is blocked. The prerequisite applies to
+the selected Kiro or KAS backend only. With Codex or another independent ACP
+backend, the status endpoint reports `required: false` to owners and members,
+without probing Kiro, reading its identity, validating its specs, or recording
+Kiro setup completion. Boot warm-up also skips the Kiro probe. The dashboard
+renders immediately and keeps a slow status poll to observe backend switches.
+Switching back to Kiro restores its real readiness checks; neither the server
+marker nor browser setup memory is granted by selecting Codex.
+
+Kiro readiness guards on reruns and the compatibility chat API apply only to
+Kiro-backed selections. Independent backends retain their own runtime install,
+authentication, sandbox and tool-permission checks. `/api/sessions/usage`
+returns `usage: null` for them without scheduling a Kiro credit scrape or
+exposing a cached Kiro account's usage. Codex model listing uses the adapter's
+advertised catalog without requiring Kiro readiness.
+
+On a new gateway using Kiro it:
 
 1. displays the connected gateway's OS so a remote browser does not imply the
    CLI is needed on the browser machine;

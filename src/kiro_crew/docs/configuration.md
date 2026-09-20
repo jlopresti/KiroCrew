@@ -85,6 +85,21 @@ provider.
 |-------|-------|--------|
 | `""` (default) | kiro-cli | full support |
 | `kas` | kiro-agent (KAS) | runs chat; some surfaces still missing |
+| `codex` | codex-acp | independent Codex backend; no Kiro CLI or Kiro login required |
+
+For Codex, install the ACP adapter and select it before opening the dashboard:
+
+```bash
+npm i -g @agentclientprotocol/codex-acp
+kirocrew config set agent.acp_backend codex
+kirocrew restart
+```
+
+The adapter includes a compatible Codex binary. Authenticate with Codex on the
+gateway host using your Codex account or provider configuration. The standalone
+`codex` CLI alone does not supply the ACP adapter. `agent.provider` stays `acp`.
+The dashboard skips Kiro's first-run setup and credit probes for this backend;
+Codex's own installation, authentication and sandbox requirements still apply.
 
 **What works on `kas`:** normal chat — your configured agent, its prompt, its tool
 allowlist, and session resume. The context-usage percentage meter, compaction

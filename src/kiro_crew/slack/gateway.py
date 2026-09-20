@@ -3249,6 +3249,10 @@ class GatewayOrchestrator:
         execute here regardless of the `--version` argument. A binary the pin
         refuses has no version worth warning about — and the pin logs why.
         """
+        from kiro_crew.kiro_prerequisite import configured_kiro_cli_required
+
+        if not await asyncio.to_thread(configured_kiro_cli_required):
+            return
         kiro_cli_bin = await _pinned_kiro_cli("the kiro-cli version check")
         if kiro_cli_bin is None:
             return

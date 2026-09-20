@@ -2074,6 +2074,8 @@ export interface TunnelStatus {
 }
 
 export interface KiroPrerequisiteStatus {
+  /** False when the selected backend does not require Kiro CLI. */
+  required?: boolean
   platform: string
   installed: boolean
   authenticated: boolean

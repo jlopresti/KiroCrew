@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { KiroPrerequisiteStatus } from '../api/client'
 import KiroPrerequisiteGate, {
@@ -73,6 +73,29 @@ describe('KiroPrerequisiteGate', () => {
   it('keeps a slow readiness poll after setup so later sign-out is detected', () => {
     expect(kiroPrerequisiteRefetchInterval(status({ ready: true }))).toBe(30_000)
     expect(kiroPrerequisiteRefetchInterval(status({ initial_setup_complete: true }))).toBe(30_000)
+  })
+
+  it.each([true, false])('opens Codex without Kiro setup (owner: %s)', async (owner) => {
+    const codex = status({
+      required: false,
+      setup_allowed: owner,
+      missing_agent_specs: ['kirocrew.json'],
+      repair_required: true,
+    })
+    vi.mocked(api.kiroPrerequisite).mockResolvedValue(codex)
+    const rendered = renderWithProviders(
+      <KiroPrerequisiteGate><div>Dashboard loaded</div></KiroPrerequisiteGate>,
+    )
+    await waitFor(() => expect(rendered.queryClient.getQueryData(['kiro-prerequisite'])).toEqual(codex))
+    expect(screen.getByText('Dashboard loaded')).toBeInTheDocument()
+    expect(screen.queryByText(/Kiro Crew uses Kiro CLI/)).not.toBeInTheDocument()
+    expect(localStorage.getItem('kirocrew:kiro-setup-complete')).toBeNull()
+    expect(kiroPrerequisiteIsBlocking(codex)).toBe(false)
+    expect(kiroPrerequisiteRefetchInterval(codex)).toBe(30_000)
+
+    // A backend switch does not inherit a fabricated Kiro setup completion.
+    act(() => { rendered.queryClient.setQueryData(['kiro-prerequisite'], status()) })
+    expect(await screen.findByText(/Kiro Crew uses Kiro CLI/)).toBeInTheDocument()
   })
 
   it('polls the host faster while the first-run gate blocks the dashboard', () => {
