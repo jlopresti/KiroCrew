@@ -368,6 +368,20 @@ in [agent-host-contract.md](agent-host-contract.md).
 
 ### Config (`config/loader.py`)
 
+Antigravity's `agy` id is also known but not selectable. It adds no provider
+value or public configuration option. The internal stream adapter is dormant,
+with no MCP channel or verified tool gate; selecting it follows the existing
+unselectable-backend fallback. Its binary-only install probe names native `agy`,
+and authentication is declared as its own system credential store, not a file.
+See [AGY onboarding](harness-onboarding.md#antigravity-internal-bridge).
+
+Copilot's `copilot` backend id is known but not selectable. It adds no provider
+value: `agent.provider` remains `acp`. A persisted Copilot selection follows the
+existing unselectable-backend fallback to Kiro; installing the binary does not
+enable it. Its transport and MCP mirror are offline preparation only, with
+`Routing.UNVERIFIED` blocking selectable registration. The activation evidence
+is listed in [harness-onboarding](harness-onboarding.md#copilot-offline-preparation).
+
 ```json
 {
   "agent": {

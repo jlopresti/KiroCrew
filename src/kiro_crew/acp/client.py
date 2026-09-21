@@ -97,8 +97,10 @@ from kiro_crew.acp.mcp_session_report import McpSessionReport
 from kiro_crew.acp.prompt_blocks import build_prompt_blocks
 from kiro_crew.acp.session_mcp import agent_spec_snapshot, session_mcp_deny_rules
 from kiro_crew.acp.types import (
+    ACP_BACKEND_AGY,
     ACP_BACKEND_CLAUDE,
     ACP_BACKEND_CODEX,
+    ACP_BACKEND_COPILOT,
     ACP_BACKEND_DEEPSEEK,
     ACP_BACKEND_GOOSE,
     ACP_BACKEND_KIRO,
@@ -292,6 +294,7 @@ PROTOCOL_VERSION_DEEPSEEK = launch_for(ACP_BACKEND_DEEPSEEK).protocol_version
 #: keeps that path free of conditionals added in service of one. A harness added
 #: later is one row here; an id with no row speaks kiro-cli's date-stamped dialect.
 _PROTOCOL_VERSION_BY_BACKEND: dict[str, int | str] = {
+    ACP_BACKEND_AGY: 1,
     ACP_BACKEND_CLAUDE: PROTOCOL_VERSION_CLAUDE,
     ACP_BACKEND_PI: PROTOCOL_VERSION_PI,
     # Every harness whose own binary serves ACP declares its dialect in its
@@ -992,6 +995,15 @@ def bump_resolution_generation(backend: str) -> None:
     OLDER one from publishing over it.
     """
     _resolution_generation[backend] = _resolution_generation.get(backend, 0) + 1
+
+
+def _resolve_agy_bin() -> tuple[str | None, str]:
+    """The internal bridge needs the native executable, not a third-party adapter."""
+    search_path = augmented_path(os.environ.get("PATH", ""))
+    override = os.environ.get("AGY_BIN")
+    if override:
+        return (override if platform_compat.is_executable_file(override) else None), search_path
+    return shutil.which("agy", path=search_path), search_path
 
 
 def _resolve_self_served_bin(backend: str) -> tuple[str | None, str]:
@@ -7433,6 +7445,21 @@ class AcpClient:
                     )
                 except acp_tool_gate.ToolGateUnroutable as exc:
                     raise AcpToolGateUnroutable(str(exc)) from None
+        elif self.backend == ACP_BACKEND_AGY:
+            binary, _search_path = await asyncio.to_thread(_resolve_agy_bin)
+            if not binary:
+                raise AcpError(
+                    "Antigravity CLI not found; install agy or set AGY_BIN to its executable"
+                )
+            argv = platform_compat.isolated_python_argv(
+                "-m", "kiro_crew.agy_acp", "--agy-bin", binary
+            )
+            spawn_label, stderr_label = "Kiro Crew AGY bridge", "agy"
+        elif self.backend == ACP_BACKEND_COPILOT:
+            # Dormant transport preparation: no permission posture is claimed and
+            # no credential-mask exception is granted without a live measurement.
+            _copilot_bin, argv, spawn_label, stderr_label = await self._resolve_self_served_launch()
+            self._session_mcp_cache = await asyncio.to_thread(self._resolve_session_mcp_servers)
         elif self._is_deepseek:
             # This harness is a plugin host and ACP is one of the profiles it boots,
             # so the argv is its own binary plus the profile selector: no adapter
@@ -8393,6 +8420,7 @@ class AcpClient:
                 *(self._claude_session_mcp_servers() if self._is_claude else []),
                 *(self._opencode_session_mcp_servers() if self._is_opencode else []),
                 *(self._goose_session_mcp_servers() if self._is_goose else []),
+                *(self._session_mcp_servers() if self.backend == ACP_BACKEND_COPILOT else []),
                 *(await asyncio.to_thread(self._pooled_mcp_servers)),
             ],
         }
@@ -8587,6 +8615,11 @@ class AcpClient:
                             *(self._claude_session_mcp_servers() if self._is_claude else []),
                             *(self._opencode_session_mcp_servers() if self._is_opencode else []),
                             *(self._goose_session_mcp_servers() if self._is_goose else []),
+                            *(
+                                self._session_mcp_servers()
+                                if self.backend == ACP_BACKEND_COPILOT
+                                else []
+                            ),
                             *(await asyncio.to_thread(self._pooled_mcp_servers)),
                         ],
                     }

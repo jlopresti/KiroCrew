@@ -54,6 +54,18 @@ for every codex session that references a server, which is the guard being right
 
 ## What a mirror must do
 
+`agy` deliberately declares `NO_CHANNEL`: the internal headless-stream bridge
+cannot project MCP and rejects nonempty server arrays. It has no mirror class
+and remains dormant; native tool observations are not permission interception.
+The activation gaps are tracked in the Antigravity section of
+`docs/system-specs/modules/harness-onboarding.md`.
+
+`copilot.py` is a dormant preparation: it emits the documented ACP MCP array
+through the existing translator and withholds narrowed servers whole. Its rulings
+describe host-side behavior, **not** an authenticated Copilot measurement.
+The backend remains unselectable with `Routing.UNVERIFIED`; synthetic replay and
+projection tests cannot establish tool reachability or permission enforcement.
+
 Implement `AgentConfigMirror` (`base.py`) in a file named after the backend, and
 register it in `registry.py`.
 

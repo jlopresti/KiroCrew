@@ -46,6 +46,7 @@ from kiro_crew.acp.client import AcpClient
 from kiro_crew.acp.harness import codex as codex_harness_mod
 from kiro_crew.acp.runtime import AcpRuntime
 from kiro_crew.agent_sdk.backends import (
+    ACP_BACKEND_COPILOT,
     ACP_BACKEND_DEEPSEEK,
     ACP_BACKEND_GOOSE,
     ACP_BACKEND_OPENCODE,
@@ -295,6 +296,14 @@ def _stub_common(stack: list, rec: _Recorder, tmp_path: Path) -> None:
             ),
             # The adapter resolvers.
             patch.object(
+                client_mod, "_resolve_agy_bin", return_value=("/opt/bin/agy", _SEARCH_PATH)
+            ),
+            patch.object(
+                client_mod.platform_compat,
+                "isolated_python_argv",
+                side_effect=lambda *args: ["/opt/bin/python", *args],
+            ),
+            patch.object(
                 client_mod,
                 "_resolve_claude_acp_bin",
                 return_value=(_CLAUDE_ACP_ARGV, _SEARCH_PATH),
@@ -330,6 +339,7 @@ def _stub_common(stack: list, rec: _Recorder, tmp_path: Path) -> None:
                     ACP_BACKEND_OPENCODE: (_OPENCODE_BIN, _SEARCH_PATH),
                     ACP_BACKEND_GOOSE: (_GOOSE_BIN, _SEARCH_PATH),
                     ACP_BACKEND_DEEPSEEK: (_DEEPSEEK_BIN, _SEARCH_PATH),
+                    ACP_BACKEND_COPILOT: ("/opt/bin/copilot", _SEARCH_PATH),
                 }[backend],
             ),
         ]

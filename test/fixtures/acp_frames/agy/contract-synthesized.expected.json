@@ -1,0 +1,113 @@
+[
+  {
+    "agent_capabilities": {
+      "loadSession": false
+    },
+    "agent_version": "0.1.0",
+    "frame": "response",
+    "id": 1,
+    "protocol_version": 1
+  },
+  {
+    "frame": "response",
+    "id": 2,
+    "session_id": "sess-synthetic-agy"
+  },
+  {
+    "action": "update",
+    "events": [
+      {
+        "kind": "text_chunk",
+        "text": "Synthetic reply."
+      }
+    ],
+    "frame": "session/update",
+    "session_update": "agent_message_chunk",
+    "text_chunk": {
+      "text": "Synthetic reply.",
+      "thinking": false
+    }
+  },
+  {
+    "action": "update",
+    "events": [
+      {
+        "kind": "tool_call",
+        "raw_tool_params": {
+          "message": "fixture"
+        },
+        "title": "fixture_tool",
+        "tool_call_id": "synthetic-call",
+        "tool_input": "{\n  \"message\": \"fixture\"\n}",
+        "tool_kind": "other",
+        "wire_title": "fixture_tool"
+      }
+    ],
+    "frame": "session/update",
+    "session_update": "tool_call"
+  },
+  {
+    "action": "permission",
+    "events": [
+      {
+        "kind": "permission_request",
+        "mcp_identity_trusted": true,
+        "options": [
+          {
+            "id": "allow-once",
+            "label": "Allow once"
+          },
+          {
+            "id": "reject-once",
+            "label": "Reject once"
+          }
+        ],
+        "raw_params_trusted": true,
+        "raw_tool_params": {
+          "message": "fixture"
+        },
+        "request_id": 7,
+        "shell_classified": true,
+        "title": "fixture_tool",
+        "tool_call_id": "synthetic-call",
+        "tool_input": "{\n  \"message\": \"fixture\"\n}",
+        "tool_kind": "other"
+      }
+    ],
+    "frame": "session/request_permission",
+    "recorded_options": {
+      "always": "allow-once",
+      "once": "allow-once",
+      "reject": "reject-once"
+    }
+  },
+  {
+    "action": "update",
+    "events": [
+      {
+        "kind": "tool_result",
+        "tool_call_id": "synthetic-call",
+        "tool_final": true,
+        "tool_output": "Synthetic result.",
+        "tool_output_bytes": 17,
+        "tool_output_digest": "b441db2c3ba7b3d3fdb4b312885afbcefe4aedd2c9c0cadcd9a585f4bcc1d5bb",
+        "tool_status": "completed"
+      }
+    ],
+    "frame": "session/update",
+    "session_update": "tool_call_update"
+  },
+  {
+    "frame": "response",
+    "id": 3,
+    "stop_reason": "end_turn"
+  },
+  {
+    "error": {
+      "code": -32000,
+      "message": "Synthetic authentication failure"
+    },
+    "frame": "response",
+    "id": 4
+  }
+]

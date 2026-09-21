@@ -1,4 +1,22 @@
 {
+  "agy": {
+    "argv": [
+      "/opt/bin/python",
+      "-m",
+      "kiro_crew.agy_acp",
+      "--agy-bin",
+      "/opt/bin/agy"
+    ],
+    "env_added": {
+      "KIROCREW_RUNTIME_PYTHON": "<interpreter>",
+      "KIROCREW_SESSION_KEY": "golden-session",
+      "KIROCREW_SPAWNED": "1",
+      "KIROCREW_STUB_SESSION_TOKEN": "<session-token>",
+      "PATH": "<augmented-path>"
+    },
+    "spawn_label": "Kiro Crew AGY bridge",
+    "stderr_label": "agy"
+  },
   "claude": {
     "argv": [
       "/opt/bin/node",
@@ -20,6 +38,7 @@
       "/opt/lib/codex-acp/index.js"
     ],
     "env_added": {
+      "DISABLE_MCP_CONFIG_FILTERING": "true",
       "KIROCREW_RUNTIME_PYTHON": "<interpreter>",
       "KIROCREW_SPAWNED": "1",
       "KIROCREW_SPAWN_INSTANCE": "<spawn-instance>",
@@ -27,6 +46,22 @@
     },
     "env_removed": [],
     "served_by": "AcpRuntime"
+  },
+  "copilot": {
+    "argv": [
+      "/opt/bin/copilot",
+      "--acp",
+      "--stdio"
+    ],
+    "env_added": {
+      "KIROCREW_RUNTIME_PYTHON": "<interpreter>",
+      "KIROCREW_SESSION_KEY": "golden-session",
+      "KIROCREW_SPAWNED": "1",
+      "KIROCREW_STUB_SESSION_TOKEN": "<session-token>",
+      "PATH": "<augmented-path>"
+    },
+    "spawn_label": "copilot --acp --stdio",
+    "stderr_label": "copilot"
   },
   "deepseek": {
     "argv": [

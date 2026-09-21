@@ -30,8 +30,10 @@ from dataclasses import dataclass
 from enum import Enum
 
 from kiro_crew.acp_backends import (
+    ACP_BACKEND_AGY,
     ACP_BACKEND_CLAUDE,
     ACP_BACKEND_CODEX,
+    ACP_BACKEND_COPILOT,
     ACP_BACKEND_DEEPSEEK,
     ACP_BACKEND_GOOSE,
     ACP_BACKEND_KAS,
@@ -42,6 +44,7 @@ from kiro_crew.acp_backends import (
 from kiro_crew.providers.mirrors.base import AgentConfigMirror
 from kiro_crew.providers.mirrors.claude_code import ClaudeCodeMirror
 from kiro_crew.providers.mirrors.codex import CodexMirror
+from kiro_crew.providers.mirrors.copilot import CopilotMirror
 from kiro_crew.providers.mirrors.goose import GooseMirror
 from kiro_crew.providers.mirrors.opencode import OpenCodeMirror
 
@@ -198,6 +201,7 @@ class McpProjection:
 MIRRORS: dict[str, type[AgentConfigMirror]] = {
     ACP_BACKEND_CLAUDE: ClaudeCodeMirror,
     ACP_BACKEND_CODEX: CodexMirror,
+    ACP_BACKEND_COPILOT: CopilotMirror,
     ACP_BACKEND_OPENCODE: OpenCodeMirror,
     ACP_BACKEND_GOOSE: GooseMirror,
 }
@@ -208,6 +212,19 @@ MIRRORS: dict[str, type[AgentConfigMirror]] = {
 #: selectable backend to exactly one entry here, so a new harness cannot reach the
 #: dashboard switch without one of these four answers being written down.
 PROJECTIONS: dict[str, McpProjection] = {
+    ACP_BACKEND_AGY: McpProjection(
+        kind=ProjectionKind.NO_CHANNEL,
+        reason="The internal AGY bridge uses native stream-json and rejects nonempty "
+        "session MCP arrays instead of silently dropping them; not selectable",
+        channel="an isolated native MCP configuration channel with verified tool permissions",
+        tracking="docs/system-specs/modules/harness-onboarding.md#antigravity-internal-bridge",
+    ),
+    ACP_BACKEND_COPILOT: McpProjection(
+        kind=ProjectionKind.MIRROR,
+        reason="copilot.py — host-side preparation of the documented session MCP "
+        "array, with an unmeasured authenticated round trip; not selectable",
+        per_tool_deny=PerToolDeny.WHOLE_SERVER,
+    ),
     ACP_BACKEND_KIRO: McpProjection(
         kind=ProjectionKind.NATIVE,
         reason=(

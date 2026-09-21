@@ -309,8 +309,10 @@ def test_known_membership_is_unchanged_by_the_move() -> None:
     """
     assert sorted(sdk_backends.ACP_BACKENDS_KNOWN) == [
         "",
+        "agy",
         "claude",
         "codex",
+        "copilot",
         "deepseek",
         "goose",
         "kas",
@@ -326,10 +328,12 @@ def test_known_membership_is_unchanged_by_the_move() -> None:
 #: rather than derived from the sets, so a change to a set fails HERE with the
 #: backend named instead of passing tautologically.
 EXPECTED_CAPABILITIES = {
+    "agy": (PROVIDER_ACP, "agy", False, False, False),
     "": (PROVIDER_ACP, MODEL_NAMESPACE_ACP, False, False, False),
     "kas": (PROVIDER_ACP, MODEL_NAMESPACE_ACP, False, False, False),
     "claude": (PROVIDER_CLAUDE_CODE, "claude_code", True, True, True),
     "codex": (PROVIDER_ACP, "codex", True, True, True),
+    "copilot": (PROVIDER_ACP, "copilot", True, False, False),
     "nope": (PROVIDER_ACP, MODEL_NAMESPACE_ACP, False, False, False),
 }
 

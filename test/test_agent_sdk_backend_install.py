@@ -103,6 +103,7 @@ def _stub_resolvers(
     # HAS the codex adapter installed the real resolver answers ``installed`` and the
     # test fails for a property of the machine rather than of the code.
     monkeypatch.setattr(client, "_resolve_codex_acp_bin", lambda: codex_acp)
+    monkeypatch.setattr(client, "_resolve_agy_bin", lambda: (None, "/synthetic/path"))
     # The self-served harnesses, stubbed through the ONE resolver they share. The
     # default answers every MEMBER of the launch table rather than naming harnesses,
     # so onboarding one needs no edit here -- and every member needs an answer for
@@ -847,8 +848,10 @@ class TestEndpointPayloadShape:
 
         rows = json.loads(response.text or "{}")["backends"]
         assert [r["policy_id"] for r in rows] == [
+            "agy",
             "claude",
             "codex",
+            "copilot",
             "deepseek",
             "goose",
             "kas",

@@ -196,6 +196,11 @@ ACP_BACKEND_KAS = "kas"
 # translates ACP onto its operations. Selectable on a plain build, with an install
 # probe in ``agent_sdk/backend_install.py`` behind the switch.
 ACP_BACKEND_CODEX = "codex"
+# Native ACP transport; permission routing is unmeasured, so this id is dormant.
+ACP_BACKEND_COPILOT = "copilot"
+# Internal bridge; AGY's headless interface cannot route tool approvals.
+ACP_BACKEND_AGY = "agy"
+AGY_INSTALL_COMMAND = "curl -fsSL https://antigravity.google/cli/install.sh | bash"
 # OpenCode: a single binary that serves ACP itself (``opencode acp``). No npm
 # adapter and no Node floor, because the harness's own published package ships the
 # executable -- which is why its install probe names one component and its
@@ -256,6 +261,8 @@ ACP_BACKEND_KIRO = ""
 # kiro-cli, so provider construction rejects it instead.
 ACP_BACKENDS_KNOWN: FrozenSet[str] = frozenset(
     {
+        ACP_BACKEND_AGY,
+        ACP_BACKEND_COPILOT,
         ACP_BACKEND_KIRO,
         ACP_BACKEND_CLAUDE,
         ACP_BACKEND_KAS,
@@ -379,6 +386,9 @@ ACP_BACKENDS_META_IDENTITY: FrozenSet[str] = frozenset({ACP_BACKEND_GOOSE})
 # has to it.
 ACP_BACKENDS_SESSION_MCP_ARRAY: FrozenSet[str] = frozenset(
     {
+        # Prepared from the documented ACP channel, not a verified live mount.
+        # The unverified routing keeps Copilot outside the selectable baseline.
+        ACP_BACKEND_COPILOT,
         ACP_BACKEND_CLAUDE,
         ACP_BACKEND_CODEX,
         ACP_BACKEND_OPENCODE,
@@ -498,6 +508,8 @@ BASELINE_SELECTABLE_BACKENDS: FrozenSet[str] = frozenset(
 POLICY_ID_KIRO = "kiro"
 
 POLICY_ID_BY_BACKEND: dict = {
+    ACP_BACKEND_AGY: ACP_BACKEND_AGY,
+    ACP_BACKEND_COPILOT: ACP_BACKEND_COPILOT,
     ACP_BACKEND_KIRO: POLICY_ID_KIRO,
     ACP_BACKEND_KAS: ACP_BACKEND_KAS,
     ACP_BACKEND_CLAUDE: ACP_BACKEND_CLAUDE,
@@ -575,9 +587,9 @@ def register_selectable_backend(backend: str) -> None:
     otherwise is a frozen literal plus a test that names it.
 
     There is deliberately NO opt-out. A keyword flag here would be a documented way
-    to put an ungated harness on the switch, and no shipped caller wants one: every
-    known backend but one is routed, and the one that is not is deliberately absent
-    from the selectable baseline. A harness must have established routing BEFORE it
+    to put an ungated harness on the switch, and no shipped caller wants one:
+    unverified backends are deliberately absent from the selectable baseline.
+    A harness must have established routing BEFORE it
     can be selectable — an edition that needs otherwise arrives with its own caller
     and its own justification, which is a conversation rather than a flag.
     """
@@ -1483,6 +1495,7 @@ def effort_config_option_id(backend: str) -> str:
 # a pick that did not come from the capture is a pick the session refuses.
 ACP_BACKENDS_ADVERTISED_MODEL_SELECTION = frozenset(
     {
+        ACP_BACKEND_COPILOT,
         ACP_BACKEND_CLAUDE,
         ACP_BACKEND_CODEX,
         ACP_BACKEND_OPENCODE,
@@ -1536,6 +1549,8 @@ ACP_BACKENDS_SEED_LOCAL_SETTINGS = frozenset({ACP_BACKEND_CLAUDE})
 # namespace is a passthrough -- which is exactly right for ids the backend itself
 # advertised.
 _MODEL_REGISTRY_NAMESPACE_BY_BACKEND: dict = {
+    ACP_BACKEND_AGY: "agy",
+    ACP_BACKEND_COPILOT: "copilot",
     ACP_BACKEND_CLAUDE: "claude_code",
     ACP_BACKEND_KIRO: "acp",
     ACP_BACKEND_KAS: "acp",
@@ -1723,6 +1738,7 @@ ACP_BACKENDS_HOST_AUTH_CALLBACK = frozenset({ACP_BACKEND_KAS})
 # (``test/fixtures/acp_frames/pi/session-load-live.jsonl``).
 ACP_BACKENDS_HARNESS_OWNED_SESSIONS = frozenset(
     {
+        ACP_BACKEND_COPILOT,
         ACP_BACKEND_CLAUDE,
         ACP_BACKEND_CODEX,
         ACP_BACKEND_OPENCODE,
@@ -1877,6 +1893,9 @@ class Routing(str, Enum):
 #: A ``.get(backend, Routing.UNVERIFIED)`` read is deliberate: an id this table
 #: does not name fails closed rather than inheriting a neighbour's mechanism.
 ACP_BACKEND_ROUTING: dict = {
+    ACP_BACKEND_AGY: Routing.UNVERIFIED,
+    # A permission dialog alone does not prove saved approvals cannot bypass it.
+    ACP_BACKEND_COPILOT: Routing.UNVERIFIED,
     ACP_BACKEND_KIRO: Routing.AGENT_SPEC,
     ACP_BACKEND_KAS: Routing.AGENT_SPEC,
     ACP_BACKEND_CLAUDE: Routing.SEEDED_SETTINGS,
@@ -2013,6 +2032,18 @@ class SelfServedLaunch:
 #: opencode's config read-back, goose's mode seed and deepseek's absence of either
 #: are not launch facts and are not here.
 ACP_BACKEND_LAUNCH: Mapping[str, SelfServedLaunch] = {
+    ACP_BACKEND_COPILOT: SelfServedLaunch(
+        label="GitHub Copilot CLI",
+        binary="copilot",
+        acp_args=("--acp", "--stdio"),
+        bin_env_var="COPILOT_BIN",
+        install_command="npm i -g @github/copilot",
+        protocol_version=1,
+        missing_hint=(
+            "Copilot serves ACP itself. This backend is not offered until its "
+            "permission routing and authenticated sessions are verified."
+        ),
+    ),
     ACP_BACKEND_OPENCODE: SelfServedLaunch(
         label="OpenCode",
         binary="opencode",
@@ -2076,6 +2107,7 @@ ACP_BACKENDS_SELF_SERVED_ACP: FrozenSet[str] = frozenset(ACP_BACKEND_LAUNCH)
 #: and the claude, codex and pi adapters are Node entry scripts whose basenames live
 #: with their resolvers in the ACP layer, which this module must not import.
 ACP_BACKEND_PROCESS_NAMES: Mapping[str, str] = {
+    ACP_BACKEND_AGY: "agy",
     ACP_BACKEND_KIRO: "kiro-cli",
     ACP_BACKEND_KAS: "kiro-cli",
     ACP_BACKEND_CLAUDE: "claude-agent-acp",

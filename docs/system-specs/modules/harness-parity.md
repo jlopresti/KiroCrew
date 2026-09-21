@@ -22,7 +22,12 @@ core can spell is an id an operator can choose unless something states the
 exception — pinned by
 `test_agent_backend_editable.py::test_baseline_ships_every_known_backend`, which
 guards against an undocumented NARROWING rather than a widening.
-There is one exception today: `ACP_BACKEND_DEEPSEEK`. It passes the install-probe
+The exceptions are `ACP_BACKEND_DEEPSEEK`, `ACP_BACKEND_COPILOT` and
+`ACP_BACKEND_AGY`. AGY has an internal headless-stream bridge, but no verified
+tool interception or MCP channel; it remains dormant with `UNVERIFIED` routing.
+Copilot has
+offline transport preparation but no authenticated permission-routing evidence;
+it remains `UNVERIFIED` and cannot be registered as selectable. DeepSeek passes the install-probe
 half of the bar and fails the routing half — its own sandbox decides its tool calls, so
 Crew's PreToolUse gate would not run for what a session actually does — and it is named
 in `NOT_SHIPPED_SELECTABLE` with that reason. Empty remains the state to return to, and

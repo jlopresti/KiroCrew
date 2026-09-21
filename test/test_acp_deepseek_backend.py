@@ -25,6 +25,7 @@ from kiro_crew.acp.client import AcpClient
 from kiro_crew.acp.session_handle import models_from_config_options
 from kiro_crew.acp_backends import (
     ACP_BACKEND_CLAUDE,
+    ACP_BACKEND_COPILOT,
     ACP_BACKEND_DEEPSEEK,
     ACP_BACKEND_KIRO,
     ACP_BACKENDS_ADVERTISED_MODEL_SELECTION,
@@ -259,16 +260,18 @@ def test_a_routed_harness_still_registers() -> None:
         sdk_backends._selectable.update(selectable_before)
 
 
-def test_deepseek_is_the_only_unverified_known_backend() -> None:
+def test_unverified_known_backends_are_explicitly_dormant() -> None:
     """The audit the refusal rests on, kept as a test so it cannot go quietly stale.
 
-    If a second harness ever resolves to ``UNVERIFIED`` -- including by being absent
+    If another harness resolves to ``UNVERIFIED`` -- including by being absent
     from the routing table, which ``routing_for`` answers ``UNVERIFIED`` for -- the
     refusal above starts applying to it too. That may be right, but it must be
     noticed rather than discovered when an edition's registration begins failing.
     """
     unverified = {b for b in ACP_BACKENDS_KNOWN if routing_for(b) is Routing.UNVERIFIED}
-    assert unverified == {ACP_BACKEND_DEEPSEEK}
+    from kiro_crew.agent_sdk.backends import ACP_BACKEND_AGY
+
+    assert unverified == {ACP_BACKEND_DEEPSEEK, ACP_BACKEND_COPILOT, ACP_BACKEND_AGY}
     # Every known id is named EXPLICITLY, so none of the others is unverified merely
     # by omission.
     from kiro_crew.acp_backends import ACP_BACKEND_ROUTING

@@ -304,6 +304,14 @@ def codex_adapter_install_command() -> str:
     return f"npm i -g {CODEX_ACP_NPM_PKG}"
 
 
+def agy_resolves() -> bool:
+    """The internal bridge ships with Crew; only the native CLI is external."""
+    from kiro_crew.acp.client import _resolve_agy_bin
+
+    binary, _search_path = _resolve_agy_bin()
+    return bool(binary)
+
+
 def self_served_resolves(backend: str) -> bool:
     """Whether *backend*'s own binary resolves on this host right now.
 

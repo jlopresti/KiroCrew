@@ -31,6 +31,107 @@ Dormant is a legitimate destination, and shipping there deliberately is cheaper
 than a long-lived branch. But it must be *named* as an exception (Stage 7), or
 the narrowing check fails.
 
+### Copilot offline preparation
+
+`ACP_BACKEND_COPILOT` is known but not selectable. This is preparation, not a
+supported public backend. GitHub documents native
+[`copilot --acp --stdio`](https://docs.github.com/en/copilot/reference/copilot-cli-reference/acp-server).
+The launch record uses integer protocol version `1`, an optional `COPILOT_BIN`
+override, and `npm i -g @github/copilot` as the install hint. Installation is never
+performed by these tests and does not unlock the selector.
+
+Implemented host-side contracts:
+
+- A per-session `AcpClient` launch, without a shared runtime or sandbox delegation.
+- A session MCP mirror reusing the existing translator and whole-server
+  withholding, including pooled stubs. No native Copilot settings are modified.
+- Dynamic model selection from the session's advertised catalog, with no
+  hardcoded model id. Resume is attempted only when advertised; its live response
+  shape is unmeasured.
+- Independent auth declaration: `.copilot/config.json` is the documented file
+  fallback, re-anchored by `COPILOT_HOME`; no adapter credential carveout.
+  The system credential store and additional MCP secret stores are not validated.
+- Offline launch, handshake/new/load, model, projection, error and non-selectability
+  tests. Replay examples under `test/fixtures/acp_frames/copilot/` are explicitly
+  **synthesized**, with version `unmeasured`; they are not recorded Copilot behavior.
+
+The optional `test/test_copilot_live_handshake.py` probe requires an explicit
+`KIROCREW_TEST_COPILOT_BIN=/absolute/path/to/copilot` and runs with temporary home,
+config, cache and working directories, no inherited auth tokens and a bounded
+process lifetime. It sends **initialize only**, not a model prompt. Run it with
+`python3 -m pytest -n0 test/test_copilot_live_handshake.py`. It needs no model
+entitlement, but is skipped without the opt-in path. Passing it proves only the
+handshake, not account access, MCP delivery or permission routing; it is not a
+pinned authenticated CI adapter lane.
+
+Before activation, someone with Copilot access must supply a pinned-version live
+capture and reproduce all of the following in an isolated environment:
+
+1. Authenticated new session, advertised model selection, prompt and resume,
+   including the successful load response shape and cancellation.
+2. MCP stdio tool discovery **and invocation**, with the result marker reaching
+   Crew unchanged; record tool identities and permission option ids.
+3. Deny a harmless sentinel file write at Crew's gate and verify the file is
+   absent; run a paired allow-once control. Repeat for native shell/file tools
+   and MCP, new and restored sessions.
+4. Repeat the denial with saved approvals, allow-all environment/config values
+   and project settings. Establish a routing posture that Crew can enforce and
+   read back before the first prompt; do not assume ACP implies every call asks.
+5. Validate credential isolation without making the agent's own auth token
+   readable to its tools, and run macOS/Linux checks before granting any sandbox
+   capability. Only then change routing and selectability with the live tests.
+
+No account is required for the current offline suite. Without those live results,
+`Routing.UNVERIFIED` and the refusal in `register_selectable_backend` remain.
+
+### Antigravity internal bridge
+
+`ACP_BACKEND_AGY` is a dormant backend, **not selectable**. Crew ships its own
+`kiro_crew.agy_acp` transport module, launched with Crew's isolated Python
+interpreter and `--agy-bin`. Resolve the native binary through `AGY_BIN` or PATH;
+the install probe checks only executability, never credentials. No third-party
+adapter, terminal scraping, internal database access or automatic installation
+is involved.
+
+The bridge implements ACP version 1 over the documented
+[Antigravity headless stream](https://antigravity.google/docs/cli/headless/):
+`agy --input-format stream-json --output-format stream-json`. Initialization
+and session creation do not launch AGY. The first text prompt launches one
+process in the session working directory; subsequent turns reuse its stdin.
+Incremental agent-response deltas become text chunks; tool steps become
+observational tool-call updates, and terminal results end the ACP turn.
+The default model is `auto` (no native model flag); an explicit model can be set
+before the first prompt only. There is no invented model catalog.
+
+Deliberate limitations and refusals:
+
+- Only text prompts, one session per bridge. No images, agent-spec projection,
+  system-prompt delivery, native hooks, resume, compaction or model discovery.
+- No MCP projection: nonempty `mcpServers` is rejected, never silently discarded.
+  No native settings files are modified. Ambient native tools/configuration are
+  not controlled by this bridge.
+- No permission interception. Native headless policies decide tool calls;
+  observing a tool update does not reach Crew's PreToolUse gate. No skip-permission
+  flag is added. A native `SUCCESS` may include a softly denied tool and is not
+  evidence of permission parity. Routing remains `UNVERIFIED`.
+- Native usage counters are cumulative across turns and are not reported as
+  per-turn billing. Auth is owned by AGY's system credential store, represented by
+  `own_credential_store`; no unverified credential file or sandbox exemption is
+  declared. Keyring isolation and inherited credentials remain unmeasured.
+- Cancellation, stream failure and a 300-second turn timeout terminate/reap the
+  native process and close the session. Frames are bounded to 4 MiB; stderr and
+  native error details are not reflected into ACP errors. Model/auth remedies are
+  intentionally generic. Cancellation cannot resume that conversation.
+
+`test/test_agy_acp.py` uses fake processes and streams, not a real authenticated
+CLI. Launch snapshots and replay examples are synthetic. The corpus's permission
+frame tests the host parser only: this bridge does **not** emit it.
+Before activation, pin a real AGY version and establish a supported interception
+channel with deny/allow controls; verify MCP delivery, essential context,
+credential isolation, native configuration precedence, and process cleanup
+(including abrupt bridge death and descendant reaping) on macOS/Linux. Until
+then, no selectable registration or sandbox delegation is permitted.
+
 ## Stage 1 — the vocabulary, in the leaf
 
 Everything a consumer needs to *name* your harness goes in

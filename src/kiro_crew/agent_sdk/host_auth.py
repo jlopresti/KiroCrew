@@ -62,8 +62,10 @@ from pathlib import PurePosixPath
 from typing import Dict, FrozenSet, Protocol, Tuple, runtime_checkable
 
 from kiro_crew.agent_sdk.backends import (
+    ACP_BACKEND_AGY,
     ACP_BACKEND_CLAUDE,
     ACP_BACKEND_CODEX,
+    ACP_BACKEND_COPILOT,
     ACP_BACKEND_DEEPSEEK,
     ACP_BACKEND_GOOSE,
     ACP_BACKEND_KAS,
@@ -87,9 +89,8 @@ ENTITLEMENT_HOST_IDENTITY_STORE = "host_identity_store"
 #: itself. Kiro Crew never reads it and only ever checks that it exists.
 ENTITLEMENT_OWN_CREDENTIAL_FILE = "own_credential_file"
 
-# Two sources, because two are constructed. A harness whose entitlement arrives
-# from the ambient cloud environment (an AWS profile, an instance role) rather than
-# from a file it owns would add a third here, with its label, when it exists.
+# Antigravity documents a system keyring, not a credential file Crew can probe.
+ENTITLEMENT_OWN_CREDENTIAL_STORE = "own_credential_store"
 
 #: Entitlement source -> what to call it in front of an operator.
 #:
@@ -101,12 +102,14 @@ ENTITLEMENT_OWN_CREDENTIAL_FILE = "own_credential_file"
 ENTITLEMENT_LABELS: Dict[str, str] = {
     ENTITLEMENT_HOST_IDENTITY_STORE: "kiro-cli's own sign-in",
     ENTITLEMENT_OWN_CREDENTIAL_FILE: "the harness's own credential file",
+    ENTITLEMENT_OWN_CREDENTIAL_STORE: "the harness's own system credential store",
 }
 
 ENTITLEMENT_SOURCES: FrozenSet[str] = frozenset(
     {
         ENTITLEMENT_HOST_IDENTITY_STORE,
         ENTITLEMENT_OWN_CREDENTIAL_FILE,
+        ENTITLEMENT_OWN_CREDENTIAL_STORE,
     }
 )
 
@@ -370,6 +373,36 @@ _KAS_SIGNED_OUT = (
 #: becomes selectable by joining that set, and joining it without an auth answer
 #: is exactly how a live OAuth token stayed off the credential floor once already.
 AGENT_AUTH_DECLARATIONS: Tuple[AgentAuthDeclaration, ...] = (
+    AgentAuthDeclaration(
+        backend=ACP_BACKEND_AGY,
+        credential_leaves=(),
+        home_override_env_vars=(),
+        adapter_own_leaves=(),
+        sign_in_remedy=(
+            "Run agy interactively on the gateway host to sign in. Antigravity owns "
+            "its system-keyring authentication, independently of Kiro. Credential "
+            "isolation and tool approval routing are unverified; this backend is not offered."
+        ),
+        signed_out_message="Antigravity requires authentication; run agy interactively to sign in.",
+        host_logout_retires_children=False,
+        entitlement_source=ENTITLEMENT_OWN_CREDENTIAL_STORE,
+    ),
+    AgentAuthDeclaration(
+        backend=ACP_BACKEND_COPILOT,
+        credential_leaves=(".copilot/config.json",),
+        home_override_env_vars=("COPILOT_HOME",),
+        override_relative_leaves=("config.json",),
+        adapter_own_leaves=(),
+        sign_in_remedy=(
+            "Sign in with copilot login on the gateway host. Copilot uses its own "
+            "system credential store or configuration-file fallback, not Kiro sign-in. "
+            "This backend is not offered: authenticated sessions and permission "
+            "routing are unverified."
+        ),
+        signed_out_message="Copilot requires authentication. Run copilot login on the gateway host.",
+        host_logout_retires_children=False,
+        entitlement_source=ENTITLEMENT_OWN_CREDENTIAL_FILE,
+    ),
     AgentAuthDeclaration(
         backend=ACP_BACKEND_KIRO,
         # None of its own. kiro-cli signs in to the HOST identity store, whose
@@ -813,6 +846,7 @@ __all__ = [
     "ENTITLEMENT_HOST_IDENTITY_STORE",
     "ENTITLEMENT_LABELS",
     "ENTITLEMENT_OWN_CREDENTIAL_FILE",
+    "ENTITLEMENT_OWN_CREDENTIAL_STORE",
     "ENTITLEMENT_SOURCES",
     "UNKNOWN_AGENT_AUTH",
     "backends_retired_by_host_logout",

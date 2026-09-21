@@ -45,6 +45,7 @@ from dataclasses import dataclass
 from typing import Callable, Dict, List, Tuple
 
 from kiro_crew.agent_sdk.backends import (
+    ACP_BACKEND_AGY,
     ACP_BACKEND_CLAUDE,
     ACP_BACKEND_CODEX,
     ACP_BACKEND_KAS,
@@ -53,6 +54,7 @@ from kiro_crew.agent_sdk.backends import (
     ACP_BACKEND_PROCESS_NAMES,
     ACP_BACKENDS_KNOWN,
     ACP_BACKENDS_SELF_SERVED_ACP,
+    AGY_INSTALL_COMMAND,
     POLICY_ID_BY_BACKEND,
     launch_for,
 )
@@ -324,6 +326,17 @@ def _probe_codex() -> BackendInstallState:
     )
 
 
+def _probe_agy() -> BackendInstallState:
+    present = acp_driver.agy_resolves()
+    return BackendInstallState(
+        ACP_BACKEND_AGY,
+        _policy_id(ACP_BACKEND_AGY),
+        INSTALLED if present else MISSING,
+        () if present else ("agy",),
+        "" if present else AGY_INSTALL_COMMAND,
+    )
+
+
 def _probe_pi() -> BackendInstallState:
     """The pi backend needs BOTH components, and names the absent one.
 
@@ -369,6 +382,7 @@ def _probe_pi() -> BackendInstallState:
 #: is the only one today. Nothing can detect the delegation automatically -- it is a
 #: call inside a function body -- so this note is the forcing function.
 _PROBES: Dict[str, Callable[[], BackendInstallState]] = {
+    ACP_BACKEND_AGY: _probe_agy,
     ACP_BACKEND_KIRO: _probe_kiro,
     ACP_BACKEND_KAS: _probe_kas,
     ACP_BACKEND_CLAUDE: _probe_claude,

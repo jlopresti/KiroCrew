@@ -1,0 +1,9 @@
+{"_meta":{"backend":"agy","recorded":"synthesized","date":"2026-09-21","agent_version":"0.1.0","note":"Offline INTERNAL BRIDGE contract only, not captured from native AGY. The permission frame is deliberately a host-parser exercise: this bridge DOES NOT emit permission requests or intercept tools. No authenticated routing, MCP or isolation evidence. Backend remains unselectable."}}
+{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":1,"agentInfo":{"name":"kirocrew-agy-bridge","version":"0.1.0"},"agentCapabilities":{"loadSession":false},"authMethods":[]}}
+{"jsonrpc":"2.0","id":2,"result":{"sessionId":"sess-synthetic-agy"}}
+{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"sess-synthetic-agy","update":{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":"Synthetic reply."}}}}
+{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"sess-synthetic-agy","update":{"sessionUpdate":"tool_call","toolCallId":"synthetic-call","title":"fixture_tool","kind":"other","status":"pending","rawInput":{"message":"fixture"}}}}
+{"jsonrpc":"2.0","id":7,"method":"session/request_permission","params":{"sessionId":"sess-synthetic-agy","toolCall":{"toolCallId":"synthetic-call","title":"fixture_tool","kind":"other","status":"pending","rawInput":{"message":"fixture"}},"options":[{"optionId":"allow-once","name":"Allow once","kind":"allow_once"},{"optionId":"reject-once","name":"Reject once","kind":"reject_once"}]}}
+{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"sess-synthetic-agy","update":{"sessionUpdate":"tool_call_update","toolCallId":"synthetic-call","status":"completed","content":[{"type":"content","content":{"type":"text","text":"Synthetic result."}}]}}}
+{"jsonrpc":"2.0","id":3,"result":{"stopReason":"end_turn"}}
+{"jsonrpc":"2.0","id":4,"error":{"code":-32000,"message":"Synthetic authentication failure"}}

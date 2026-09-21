@@ -16,8 +16,10 @@ from typing import Any, Dict, List
 import pytest
 
 from kiro_crew.acp_backends import (
+    ACP_BACKEND_AGY,
     ACP_BACKEND_CLAUDE,
     ACP_BACKEND_CODEX,
+    ACP_BACKEND_COPILOT,
     ACP_BACKEND_DEEPSEEK,
     ACP_BACKEND_GOOSE,
     ACP_BACKEND_KAS,
@@ -35,7 +37,7 @@ FIELD = "agent.acp_backend"
 #: Known ids the public baseline deliberately does not offer, each entry carrying its
 #: reason in ``test_baseline_ships_every_known_backend``. Empty was the state until the
 #: first exception; an entry is a reasoned exclusion rather than a defect, and it earns
-#: its place by naming what the id fails. ``deepseek`` is the one member today.
+#: its place by naming what the id fails.
 #:
 #: deepseek passes the install-probe half of the selectability bar and fails the
 #: ROUTING half. Its sandbox decides its own tool calls -- an in-policy action runs
@@ -45,7 +47,12 @@ FIELD = "agent.acp_backend"
 #: justification. Four live captures across its confined and read-only postures raised
 #: no permission request at all. So Crew's PreToolUse gate would not run for what a
 #: session actually does, and the switch would be offering a harness Crew cannot gate.
-NOT_SHIPPED_SELECTABLE: frozenset = frozenset({ACP_BACKEND_DEEPSEEK})
+#: Copilot has only offline transport preparation. Its permission routing has not
+#: been measured, including the effect of saved approvals and allow-all settings.
+# AGY's internal stream bridge has no native permission interception or MCP channel.
+NOT_SHIPPED_SELECTABLE: frozenset = frozenset(
+    {ACP_BACKEND_DEEPSEEK, ACP_BACKEND_COPILOT, ACP_BACKEND_AGY}
+)
 
 
 @pytest.fixture

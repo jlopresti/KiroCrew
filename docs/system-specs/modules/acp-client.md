@@ -6,6 +6,25 @@ The ACP layer spans **five** modules: the legacy per-session client (`acp/client
 
 ## Backend Selection
 
+Antigravity's `agy` id is known but not selectable. Its dedicated spawn arm uses
+Crew's Python interpreter to run the internal `kiro_crew.agy_acp` bridge, resolving
+`AGY_BIN` or PATH without installation. It speaks ACP version 1 on one side and
+AGY's headless `stream-json` on the other. No shared runtime, MCP projection or
+permission interception is claimed; nonempty MCP arrays are rejected. Text,
+tool observations, bounded failure and cancellation are tested offline. See the
+[bridge limits and activation checklist](harness-onboarding.md#antigravity-internal-bridge).
+
+`ACP_BACKEND_COPILOT` is a dormant, non-selectable backend. Its native command is
+`copilot --acp --stdio` (`COPILOT_BIN` override), with integer ACP version `1`.
+The per-session `AcpClient` prepares MCP arrays on both new and load requests;
+`CopilotMirror` filters the spec and pooled stubs together, withholding a server
+whole when narrowed. No native Copilot settings are written. Model selection
+uses the session-advertised catalog; shared runtime and internal-sandbox
+delegation are not enabled. Routing is `UNVERIFIED`, so registration as selectable
+is refused. Neither synthetic frames nor the optional handshake test establish
+authenticated MCP reachability or permission enforcement. See the
+[Copilot onboarding checklist](harness-onboarding.md#copilot-offline-preparation).
+
 Codex's harness sets `DISABLE_MCP_CONFIG_FILTERING=true` for its adapter process:
 session-projected MCP entries must win over same-named provider-global entries.
 Otherwise codex-acp drops the GitHub bearer supplied by the Connections adapter
